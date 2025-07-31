@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>七岚州名单查询系统</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 引入SheetJS用于处理Excel文件 -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#6366F1',
+                        danger: '#EF4444',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .shadow-soft {
+                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            }
+            .result-item {
+                border-left: 3px solid #3B82F6;
+            }
+            .admin-result-item {
+                border-left: 3px solid #6366F1;
+            }
+            .backdrop-blur {
+                backdrop-filter: blur(8px);
+            }
+            .file-drop-active {
+                @apply border-primary bg-blue-50;
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-dark min-h-screen">
+    <!-- 限制最大宽度为手机尺寸，居中显示 -->
+    <div class="max-w-md mx-auto w-full px-4 py-6 bg-white min-h-screen">
+        <!-- 页面标题 -->
+        <header class="text-center mb-6">
+            <h1 class="text-[clamp(1.5rem,5vw,2.5rem)] font-bold text-primary mb-2 tracking-tight">
+                <i class="fa fa fa-list-alt mr-2"></i>七岚州名单查询系统
+            </h1>
+            <p class="text-gray-600 text-sm md:text-base italic">
+                七揽星出品必属精品
+            </p>
+        </header>
+        
+        <!-- 后台管理按钮 -->
+        <div class="text-right mb-4">
+            <button id="adminButton" class="text-xs text-gray-500 hover:text-primary transition-colors flex items-center justify-end">
+                <i class="fa fa-cog mr-1"></i> 后台管理
+            </button>
+        </div>
+        
+        <!-- 主要内容区 -->
+        <main class="space-y-6">
+            <!-- 搜索区域 -->
+            <section class="bg-white rounded-xl shadow-soft p-5 transition-all duration-300 hover:shadow-lg border border-gray-100">
+                <h2 class="text-lg font-semibold mb-3 flex items-center">
+                    <i class="fa fa-search text-accent mr-2"></i>输入信息
+                </h2>
+                <div class="flex flex-col gap-3">
+                    <div class="w-full">
+                        <label for="searchInput" class="block text-sm font-medium text-gray-700 mb-1">
+                            游戏名称或编号
+                        </label>
+                        <div class="relative">
+                            <input 
+                                type="text" 
+                                id="searchInput" 
+                                placeholder="请输入..." 
+                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
+                            >
+                            <button id="searchButton" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary text-white p-1 rounded hover:bg-primary/90 transition-colors">
+                                <i class="fa fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="flex justify-start">
+                        <button id="clearSearch" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                            <i class="fa fa-refresh mr-1"></i> 清空
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <!-- 结果展示区域 -->
+            <section class="bg-white rounded-xl shadow-soft p-5 transition-all duration-300 hover:shadow-lg border border-gray-100">
+                <h2 class="text-lg font-semibold mb-3 flex items-center">
+                    <i class="fa fa-table text-accent mr-2"></i>查询结果
+                </h2>
+                <div id="noDataMessage" class="text-center py-8 text-gray-500">
+                    <i class="fa fa-database text-3xl mb-2 opacity-30"></i>
+                    <p class="text-sm">请输入信息查询</p>
+                </div>
+                <div id="noResultsMessage" class="text-center py-8 text-gray-500 hidden">
+                    <i class="fa fa-search text-3xl mb-2 opacity-30"></i>
+                    <p class="text-sm">未找到匹配信息</p>
+                </div>
+                <div id="resultsContainer" class="hidden">
+                    <!-- 结果数量统计 -->
+                    <div class="mt-1 mb-3 text-xs text-gray-500">
+                        <span id="resultsCount"></span>
+                    </div>
+                    
+                    <!-- 结果列表（分行显示） -->
+                    <div id="resultsList" class="space-y-3">
+                        <!-- 结果项将在这里动态动态生成 -->
+                    </div>
+                </div>
+            </section>
+        </main>
+        
+        <!-- 页脚 -->
+        <footer class="mt-8 text-center text-gray-500 text-xs">
+            <p>© 七揽星出品</p>
+        </footer>
+    </div>
+    
+    <!-- 管理员密码弹窗 -->
+    <div id="adminPasswordModal" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-xl p-5 max-w-xs w-full mx-4 transform scale-95 transition-transform duration-300">
+            <h3 class="text-base font-semibold mb-3 flex items-center">
+                <i class="fa fa-lock text-accent mr-2"></i> 管理员验证
+            </h3>
+            <p class="text-gray-600 text-sm mb-3">请输入管理员密码</p>
+            <div class="mb-3">
+                <label for="adminPasswordInput" class="block text-xs font-medium text-gray-700 mb-1">密码</label>
+                <input 
+                    type="password" 
+                    id="adminPasswordInput" 
+                    placeholder="请输入密码" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
+                >
+            </div>
+            <div class="text-red-500 text-xs mb-3 hidden" id="adminPasswordError">
+                <i class="fa fa-exclamation-circle mr-1"></i> 密码错误，请重新输入
+            </div>
+            <div class="flex justify-end gap-2">
+                <button id="cancelAdminPassword" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                    取消
+                </button>
+                <button id="confirmAdminPassword" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm">
+                    确认
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 删除确认弹窗 -->
+    <div id="deleteConfirmModal" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-60 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-xl p-5 max-w-xs w-full mx-4 transform scale-95 transition-transform duration-300">
+            <h3 class="text-base font-semibold mb-3 flex items-center text-danger">
+                <i class="fa fa-exclamation-triangle mr-2"></i> 确认删除
+            </h3>
+            <p class="text-gray-600 text-sm mb-4" id="deleteConfirmMessage">
+                您确定要删除这条数据吗？此操作不可撤销。
+            </p>
+            <div class="flex justify-end gap-2">
+                <button id="cancelDelete" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                    取消
+                </button>
+                <button id="confirmDelete" class="px-3 py-1.5 bg-danger text-white rounded-lg hover:bg-danger/90 transition-colors text-sm">
+                    确认删除
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 导入错误提示弹窗 -->
+    <div id="importErrorModal" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-60 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-xl p-5 max-w-xs w-full mx-4 transform scale-95 transition-transform duration-300">
+            <h3 class="text-base font-semibold mb-3 flex items-center text-danger">
+                <i class="fa fa-exclamation-circle mr-2"></i> 导入失败
+            </h3>
+            <div id="importErrorMessage" class="text-gray-600 text-sm mb-4 max-h-[200px] overflow-y-auto pr-2">
+                <!-- 错误信息将在这里显示 -->
+            </div>
+            <div class="flex justify-end">
+                <button id="closeImportError" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm">
+                    我知道了
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 管理员操作界面 -->
+    <div id="adminPanel" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
+        <div class="bg-white rounded-xl shadow-xl p-5 max-w-md w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-base font-semibold mb-3 flex items-center">
+                <i class="fa fa-cogs text-accent mr-2"></i> 后台管理
+            </h3>
+            
+            <!-- 手动添加数据表单 -->
+            <div class="mb-6 pb-6 border-b border-gray-200">
+                <h4 class="font-medium text-sm mb-3">手动添加数据</h4>
+                <div class="space-y-3">
+                    <div>
+                        <label for="manualGameId" class="block text-xs font-medium text-gray-700 mb-1">游戏编号 <span class="text-red-500">*</span></label>
+                        <input 
+                            type="text" 
+                            id="manualGameId" 
+                            placeholder="请输入游戏编号" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
+                        >
+                    </div>
+                    <div>
+                        <label for="manualGameName" class="block text-xs font-medium text-gray-700 mb-1">游戏名字 <span class="text-red-500">*</span></label>
+                        <input 
+                            type="text" 
+                            id="manualGameName" 
+                            placeholder="请输入游戏名字" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
+                        >
+                    </div>
+                    <div>
+                        <label for="manualPower" class="block text-xs font-medium text-gray-700 mb-1">战力 <span class="text-red-500">*</span></label>
+                        <input 
+                            type="number" 
+                            id="manualPower" 
+                            placeholder="请输入战力值" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
+                        >
+                    </div>
+                    <div>
+                        <label for="manualState" class="block text-xs font-medium text-gray-700 mb-1">所在州 <span class="text-red-500">*</span></label>
+                        <input 
+                            type="text" 
+                            id="manualState" 
+                            placeholder="请输入所在州" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
+                        >
+                    </div>
+                    <div class="flex justify-end mt-2">
+                        <button id="resetManualForm" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm mr-2">
+                            重置
+                        </button>
+                        <button id="addManualData" class="px-3 py-1.5 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors text-sm">
+                            <i class="fa fa-plus mr-1"></i> 添加数据
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 搜索删除数据功能 -->
+            <div class="mb-6 pb-6 border-b border-gray-200">
+                <h4 class="font-medium text-sm mb-3">搜索并删除数据</h4>
+                <p class="text-gray-600 text-xs mb-3">搜索出结果后，点击对应项即可删除</p>
+                
+                <!-- 搜索区域 -->
+                <div class="mb-4">
+                    <div class="relative">
+                        <input 
+                            type="text" 
+                            id="adminSearchInput" 
+                            placeholder="输入游戏名称或编号搜索..." 
+                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all outline-none text-sm"
+                        >
+                        <button id="adminSearchButton" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-accent text-white p-1 rounded hover:bg-accent/90 transition-colors">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 结果展示区域 -->
+                <div>
+                    <div id="adminNoResultsMessage" class="text-center py-6 text-gray-500 hidden">
+                        <i class="fa fa-search text-2xl mb-2 opacity-30"></i>
+                        <p class="text-xs">未找到匹配信息</p>
+                    </div>
+                    <div id="adminResultsContainer" class="hidden">
+                        <!-- 结果数量统计 -->
+                        <div class="mt-1 mb-3 text-xs text-gray-500">
+                            <span id="adminResultsCount"></span>
+                        </div>
+                        
+                        <!-- 结果列表 -->
+                        <div id="adminResultsList" class="space-y-3 max-h-[200px] overflow-y-auto pr-1">
+                            <!-- 结果项将在这里动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Excel导入功能 -->
+            <div>
+                <h4 class="font-medium text-sm mb-3">批量导入数据</h4>
+                <p class="text-gray-600 text-xs mb-4">导入Excel表格批量更新查询数据（第一行需为：游戏编号，游戏名字，战力，所在州）</p>
+                
+                <div id="adminDropArea" class="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer transition-all duration-300 hover:border-primary mb-4">
+                    <i class="fa fa-file-excel-o text-4xl text-secondary mb-3"></i>
+                    <p class="mb-2 text-sm">点击选择文件或拖放文件到此处</p>
+                    <label class="bg-primary hover:bg-primary/90 text-white py-2 px-4 rounded-lg inline-block transition-all duration-300 cursor-pointer text-sm">
+                        <span>选择Excel文件</span>
+                        <input type="file" id="adminFileInput" accept=".xlsx, .xls" class="hidden">
+                    </label>
+                    <p class="text-xs text-gray-500 mt-3">支持的格式: .xlsx, .xls</p>
+                </div>
+                
+                <div id="adminFileInfo" class="mt-3 mb-4 hidden">
+                    <div class="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
+                        <div class="flex items-center overflow-hidden">
+                            <i class="fa fa-file-text-o text-accent mr-2 flex-shrink-0"></i>
+                            <span id="adminFileName" class="font-medium text-sm truncate"></span>
+                        </div>
+                        <button id="adminRemoveFile" class="text-red-500 hover:text-red-700 transition-colors">
+                            <i class="fa fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- 导入进度提示 -->
+                <div id="importProgress" class="hidden mb-4 text-center">
+                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                    <p class="text-xs text-gray-500 mt-2">正在解析文件，请稍候...</p>
+                </div>
+                
+                <div class="flex justify-end gap-2">
+                    <button id="closeAdminPanel" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
+                        关闭
+                    </button>
+                    <button id="confirmImport" class="px-3 py-1.5 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors text-sm" disabled>
+                        <i class="fa fa-upload mr-1"></i> 确认导入
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 通知提示组件 -->
+    <div id="notification" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg translate-y-20 opacity-0 transition-all duration-300 flex items-center max-w-xs w-full">
+        <i id="notificationIcon" class="mr-2"></i>
+        <span id="notificationMessage" class="text-sm"></span>
+    </div>
+
+    <script>
+        // 从本地存储加载数据，如果没有则使用初始数据
+        let gameData = loadDataFromStorage() || [
+            {"游戏编号": "749803924", "游戏名字": "洛挽尘", "战力": 2033, "所在州": "六合主州"},
+            {"游戏编号": "11541:756356949", "游戏名字": "/嗨吧舞吧", "战力": 2833, "所在州": "六合主州"},
+            {"游戏编号": "11444:749997510", "游戏名字": "☆舞吧嗨吧", "战力": 2777, "所在州": "六合主州"},
+            {"游戏编号": "11555:757269570", "游戏名字": "弄花", "战力": 2751, "所在州": "六合主州"},
+            {"游戏编号": "11692:766250360", "游戏名字": "༄剧情", "战力": 2681, "所在州": "六合主州"},
+            {"游戏编号": "12029:788334791", "游戏名字": "大老虎", "战力": 2632, "所在州": "六合主州"},
+            {"游戏编号": "11518:754846587", "游戏名字": "/奋★斗", "战力": 2423, "所在州": "六合主州"},
+            {"游戏编号": "12022:787879622", "游戏名字": "明日香", "战力": 2304, "所在州": "六合主州"},
+            {"游戏编号": "11702:766906797", "游戏名字": "抱歉", "战力": 2212, "所在州": "六合主州"},
+            {"游戏编号": "11443:749935082", "游戏名字": "我五岁了吖", "战力": 2153, "所在州": "六合主州"}
+        ];
+        
+        // 当前管理员选择的文件
+        let adminSelectedFile = null;
+        // 待删除的游戏记录
+        let recordToDelete = null;
+        
+        // DOM元素
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const clearSearch = document.getElementById('clearSearch');
+        const noDataMessage = document.getElementById('noDataMessage');
+        const noResultsMessage = document.getElementById('noResultsMessage');
+        const resultsContainer = document.getElementById('resultsContainer');
+        const resultsList = document.getElementById('resultsList');
+        const resultsCount = document.getElementById('resultsCount');
+        const notification = document.getElementById('notification');
+        const notificationIcon = document.getElementById('notificationIcon');
+        const notificationMessage = document.getElementById('notificationMessage');
+        
+        // 管理员相关元素
+        const adminButton = document.getElementById('adminButton');
+        const adminPasswordModal = document.getElementById('adminPasswordModal');
+        const adminPasswordInput = document.getElementById('adminPasswordInput');
+        const adminPasswordError = document.getElementById('adminPasswordError');
+        const confirmAdminPassword = document.getElementById('confirmAdminPassword');
+        const cancelAdminPassword = document.getElementById('cancelAdminPassword');
+        const adminPanel = document.getElementById('adminPanel');
+        const closeAdminPanel = document.getElementById('closeAdminPanel');
+        
+        // 手动添加数据表单元素
+        const manualGameId = document.getElementById('manualGameId');
+        const manualGameName = document.getElementById('manualGameName');
+        const manualPower = document.getElementById('manualPower');
+        const manualState = document.getElementById('manualState');
+        const addManualData = document.getElementById('addManualData');
+        const resetManualForm = document.getElementById('resetManualForm');
+        
+        // 管理员搜索删除元素
+        const adminSearchInput = document.getElementById('adminSearchInput');
+        const adminSearchButton = document.getElementById('adminSearchButton');
+        const adminNoResultsMessage = document.getElementById('adminNoResultsMessage');
+        const adminResultsContainer = document.getElementById('adminResultsContainer');
+        const adminResultsList = document.getElementById('adminResultsList');
+        const adminResultsCount = document.getElementById('adminResultsCount');
+        
+        // 删除确认元素
+        const deleteConfirmModal = document.getElementById('deleteConfirmModal');
+        const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
+        const confirmDelete = document.getElementById('confirmDelete');
+        const cancelDelete = document.getElementById('cancelDelete');
+        
+        // 导入错误提示元素
+        const importErrorModal = document.getElementById('importErrorModal');
+        const importErrorMessage = document.getElementById('importErrorMessage');
+        const closeImportError = document.getElementById('closeImportError');
+        
+        // Excel导入元素
+        const adminDropArea = document.getElementById('adminDropArea');
+        const adminFileInput = document.getElementById('adminFileInput');
+        const adminFileInfo = document.getElementById('adminFileInfo');
+        const adminFileName = document.getElementById('adminFileName');
+        const adminRemoveFile = document.getElementById('adminRemoveFile');
+        const confirmImport = document.getElementById('confirmImport');
+        const importProgress = document.getElementById('importProgress');
+        
+        // 数据持久化 - 保存到本地存储
+        function saveDataToStorage() {
+            localStorage.setItem('qilanzhouGameData', JSON.stringify(gameData));
+        }
+        
+        // 数据持久化 - 从本地存储加载
+        function loadDataFromStorage() {
+            try {
+                const data = localStorage.getItem('qilanzhouGameData');
+                return data ? JSON.parse(data) : null;
+            } catch (error) {
+                console.error('加载本地数据失败:', error);
+                showNotification('加载数据失败，使用初始数据', false);
+                return null;
+            }
+        }
+        
+        // 显示通知
+        function showNotification(message, isSuccess = true) {
+            notificationMessage.textContent = message;
+            notificationIcon.className = isSuccess ? 'fa fa-check-circle text-green-500 mr-2' : 'fa fa-exclamation-circle text-red-500 mr-2';
+            notification.className = `fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg translate-y-0 opacity-100 transition-all duration-300 flex items-center max-w-xs w-full ${isSuccess ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`;
+            
+            setTimeout(() => {
+                notification.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg translate-y-20 opacity-0 transition-all duration-300 flex items-center max-w-xs w-full';
+            }, 3000);
+        }
+        
+        // 显示管理员密码弹窗
+        function showAdminPasswordModal() {
+            adminPasswordModal.classList.remove('hidden');
+            setTimeout(() => {
+                adminPasswordModal.classList.remove('opacity-0');
+                adminPasswordModal.querySelector('div').classList.remove('scale-95');
+                adminPasswordModal.querySelector('div').classList.add('scale-100');
+            }, 10);
+            adminPasswordInput.focus();
+            adminPasswordInput.value = '';
+            adminPasswordError.classList.add('hidden');
+        }
+        
+        // 隐藏管理员密码弹窗
+        function hideAdminPasswordModal() {
+            adminPasswordModal.classList.add('opacity-0');
+            adminPasswordModal.querySelector('div').classList.remove('scale-100');
+            adminPasswordModal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                adminPasswordModal.classList.add('hidden');
+            }, 300);
+        }
+        
+        // 显示管理员面板
+        function showAdminPanel() {
+            hideAdminPasswordModal();
+            adminPanel.classList.remove('hidden');
+            setTimeout(() => {
+                adminPanel.classList.remove('opacity-0');
+                adminPanel.querySelector('div').classList.remove('scale-95');
+                adminPanel.querySelector('div').classList.add('scale-100');
+            }, 10);
+            resetManualForm.click(); // 重置手动添加表单
+            adminSearchInput.value = ''; // 清空管理员搜索框
+            adminNoResultsMessage.classList.add('hidden');
+            adminResultsContainer.classList.add('hidden');
+            adminSelectedFile = null;
+            adminFileInfo.classList.add('hidden');
+            confirmImport.disabled = true;
+            importProgress.classList.add('hidden');
+        }
+        
+        // 隐藏管理员面板
+        function hideAdminPanel() {
+            adminPanel.classList.add('opacity-0');
+            adminPanel.querySelector('div').classList.remove('scale-100');
+            adminPanel.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                adminPanel.classList.add('hidden');
+                adminFileInput.value = '';
+            }, 300);
+        }
+        
+        // 显示删除确认弹窗
+        function showDeleteConfirmModal(record) {
+            recordToDelete = record;
+            deleteConfirmMessage.textContent = `您确定要删除"${record['游戏名字']}"（编号：${record['游戏编号']}）吗？此操作不可撤销。`;
+            deleteConfirmModal.classList.remove('hidden');
+            setTimeout(() => {
+                deleteConfirmModal.classList.remove('opacity-0');
+                deleteConfirmModal.querySelector('div').classList.remove('scale-95');
+                deleteConfirmModal.querySelector('div').classList.add('scale-100');
+            }, 10);
+        }
+        
+        // 隐藏删除确认弹窗
+        function hideDeleteConfirmModal() {
+            deleteConfirmModal.classList.add('opacity-0');
+            deleteConfirmModal.querySelector('div').classList.remove('scale-100');
+            deleteConfirmModal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                deleteConfirmModal.classList.add('hidden');
+                recordToDelete = null;
+            }, 300);
+        }
+        
+        // 显示导入错误弹窗
+        function showImportError(message) {
+            importErrorMessage.innerHTML = message;
+            importErrorModal.classList.remove('hidden');
+            setTimeout(() => {
+                importErrorModal.classList.remove('opacity-0');
+                importErrorModal.querySelector('div').classList.remove('scale-95');
+                importErrorModal.querySelector('div').classList.add('scale-100');
+            }, 10);
+        }
+        
+        // 隐藏导入错误弹窗
+        function hideImportError() {
+            importErrorModal.classList.add('opacity-0');
+            importErrorModal.querySelector('div').classList.remove('scale-100');
+            importErrorModal.querySelector('div').classList.add('scale-95');
+            setTimeout(() => {
+                importErrorModal.classList.add('hidden');
+            }, 300);
+        }
+        
+        // 验证管理员密码
+        function verifyAdminPassword(password) {
+            const correctPassword = '1794';
+            return password === correctPassword;
+        }
+        
+        // 验证手动输入的数据
+        function validateManualData() {
+            const gameId = manualGameId.value.trim();
+            const gameName = manualGameName.value.trim();
+            const power = manualPower.value.trim();
+            const state = manualState.value.trim();
+            
+            // 检查必填字段
+            if (!gameId) {
+                showNotification('请输入游戏编号', false);
+                manualGameId.focus();
+                return false;
+            }
+            
+            if (!gameName) {
+                showNotification('请输入游戏名字', false);
+                manualGameName.focus();
+                return false;
+            }
+            
+            if (!power) {
+                showNotification('请输入战力值', false);
+                manualPower.focus();
+                return false;
+            }
+            
+            // 检查战力是否为数字
+            if (isNaN(power) || parseInt(power) < 0) {
+                showNotification('战力值必须是有效的数字', false);
+                manualPower.focus();
+                return false;
+            }
+            
+            if (!state) {
+                showNotification('请输入所在州', false);
+                manualState.focus();
+                return false;
+            }
+            
+            return true;
+        }
+        
+        // 手动添加数据
+        function addManualRecord() {
+            if (!validateManualData()) {
+                return;
+            }
+            
+            // 创建新记录
+            const newRecord = {
+                "游戏编号": manualGameId.value.trim(),
+                "游戏名字": manualGameName.value.trim(),
+                "战力": parseInt(manualPower.value.trim()),
+                "所在州": manualState.value.trim()
+            };
+            
+            // 添加到数据中
+            gameData.push(newRecord);
+            
+            // 保存到本地存储
+            saveDataToStorage();
+            
+            // 重置表单
+            resetManualForm.click();
+            
+            // 显示成功通知
+            showNotification('数据添加成功');
+        }
+        
+        // 重置手动添加表单
+        function resetManualFormFields() {
+            manualGameId.value = '';
+            manualGameName.value = '';
+            manualPower.value = '';
+            manualState.value = '';
+            manualGameId.focus();
+        }
+        
+        // 执行删除操作
+        function executeDelete() {
+            if (!recordToDelete) return;
+            
+            // 过滤掉要删除的记录
+            const initialLength = gameData.length;
+            gameData = gameData.filter(game => 
+                !(game['游戏编号'] === recordToDelete['游戏编号'] && 
+                  game['游戏名字'] === recordToDelete['游戏名字'])
+            );
+            
+            // 保存到本地存储
+            saveDataToStorage();
+            
+            // 隐藏确认弹窗
+            hideDeleteConfirmModal();
+            
+            // 重新执行管理员搜索，更新结果列表
+            if (adminSearchInput.value.trim()) {
+                adminSearchGames();
+            }
+            
+            // 重置前台搜索结果
+            resetSearchResults();
+            
+            // 显示成功通知
+            showNotification(`成功删除记录: ${recordToDelete['游戏名字']}`);
+        }
+        
+        // 处理管理员选择的文件
+        function handleAdminFileSelection(file) {
+            // 检查文件类型
+            if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+                showNotification('请选择Excel文件 (.xlsx, .xls)', false);
+                return;
+            }
+            
+            // 检查文件大小（限制10MB）
+            if (file.size > 10 * 1024 * 1024) {
+                showNotification('文件过大，请选择10MB以下的Excel文件', false);
+                return;
+            }
+            
+            adminSelectedFile = file;
+            adminFileName.textContent = file.name;
+            adminFileInfo.classList.remove('hidden');
+            confirmImport.disabled = false;
+        }
+        
+        // 移除管理员选择的文件
+        function removeAdminFile() {
+            adminSelectedFile = null;
+            adminFileInput.value = '';
+            adminFileInfo.classList.add('hidden');
+            confirmImport.disabled = true;
+        }
+        
+        // 导入Excel文件更新数据
+        function importExcelData() {
+            if (!adminSelectedFile) return;
+            
+            // 显示加载状态
+            confirmImport.disabled = true;
+            importProgress.classList.remove('hidden');
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    // 解析Excel文件
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 获取第一个工作表
+                    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                        throw new Error('Excel文件中没有工作表，请检查文件内容');
+                    }
+                    
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    
+                    // 转换为JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    
+                    // 验证数据格式
+                    if (jsonData.length === 0) {
+                        throw new Error('Excel文件中没有数据，请检查文件内容');
+                    }
+                    
+                    // 检查是否包含必要的列
+                    const requiredColumns = ['游戏编号', '游戏名字', '战力', '所在州'];
+                    const firstRow = jsonData[0];
+                    const missingColumns = requiredColumns.filter(col => !Object.keys(firstRow).includes(col));
+                    
+                    if (missingColumns.length > 0) {
+                        throw new Error(`文件缺少必要的列: ${missingColumns.join(', ')}<br>请确保第一行为：游戏编号，游戏名字，战力，所在州`);
+                    }
+                    
+                    // 验证每一行的数据格式
+                    const invalidRows = [];
+                    jsonData.forEach((row, index) => {
+                        const rowNumber = index + 2; // 行号从2开始（第一行是标题）
+                        
+                        // 检查游戏编号
+                        if (!row['游戏编号'] || String(row['游戏编号']).trim() === '') {
+                            invalidRows.push(`第 ${rowNumber} 行：游戏编号不能为空`);
+                        }
+                        
+                        // 检查游戏名字
+                        if (!row['游戏名字'] || String(row['游戏名字']).trim() === '') {
+                            invalidRows.push(`第 ${rowNumber} 行：游戏名字不能为空`);
+                        }
+                        
+                        // 检查战力是否为有效数字
+                        if (row['战力'] === undefined || row['战力'] === null || isNaN(row['战力']) || row['战力'] < 0) {
+                            invalidRows.push(`第 ${rowNumber} 行：战力必须是有效的非负数字`);
+                        }
+                        
+                        // 检查所在州
+                        if (!row['所在州'] || String(row['所在州']).trim() === '') {
+                            invalidRows.push(`第 ${rowNumber} 行：所在州不能为空`);
+                        }
+                    });
+                    
+                    // 如果有无效行，显示错误信息
+                    if (invalidRows.length > 0) {
+                        let errorMessage = `发现 ${invalidRows.length} 行数据格式错误：<br><br>`;
+                        invalidRows.forEach(msg => {
+                            errorMessage += `- ${msg}<br>`;
+                        });
+                        throw new Error(errorMessage);
+                    }
+                    
+                    // 处理战力值为数字类型
+                    const processedData = jsonData.map(row => ({
+                        ...row,
+                        "战力": Number(row["战力"])
+                    }));
+                    
+                    // 更新游戏数据
+                    gameData = processedData;
+                    
+                    // 保存到本地存储
+                    saveDataToStorage();
+                    
+                    // 重置搜索结果
+                    resetSearchResults();
+                    
+                    // 重置管理员搜索结果
+                    adminSearchInput.value = '';
+                    adminNoResultsMessage.classList.add('hidden');
+                    adminResultsContainer.classList.add('hidden');
+                    
+                    // 隐藏加载状态
+                    importProgress.classList.add('hidden');
+                    
+                    // 移除选中的文件
+                    removeAdminFile();
+                    
+                    // 提示成功
+                    showNotification(`成功导入 ${gameData.length} 条数据`);
+                    
+                    // 关闭管理员面板
+                    hideAdminPanel();
+                } catch (error) {
+                    console.error('解析Excel文件时出错:', error);
+                    
+                    // 隐藏加载状态
+                    importProgress.classList.add('hidden');
+                    confirmImport.disabled = false;
+                    
+                    // 显示错误信息
+                    showImportError(error.message);
+                }
+            };
+            
+            reader.onerror = function() {
+                // 隐藏加载状态
+                importProgress.classList.add('hidden');
+                confirmImport.disabled = false;
+                
+                showImportError('读取文件时出错，请检查文件是否损坏或重新选择文件');
+            };
+            
+            // 处理大文件时使用分段读取
+            if (adminSelectedFile.size > 1024 * 1024) {
+                reader.readAsArrayBuffer(adminSelectedFile.slice(0, 1024 * 1024 * 5));
+            } else {
+                reader.readAsArrayBuffer(adminSelectedFile);
+            }
+        }
+        
+        // 检查两个字符串是否有至少5位数字匹配
+        function hasFiveMatchingDigits(str1, str2) {
+            // 确保两个字符串都至少有5位
+            if (str1.length < 5 || str2.length < 5) {
+                return false;
+            }
+            
+            // 计算匹配的位数
+            let matchCount = 0;
+            for (let i = 0; i < Math.min(str1.length, str2.length); i++) {
+                if (str1[i] === str2[i]) {
+                    matchCount++;
+                    if (matchCount >= 5) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        // 搜索游戏（前台）
+        function searchGames() {
+            const searchTerm = searchInput.value.trim();
+            
+            if (!searchTerm) {
+                showNotification('请输入信息', false);
+                return;
+            }
+            
+            // 清空之前的结果
+            resultsList.innerHTML = '';
+            
+            // 执行搜索
+            const results = performSearch(searchTerm);
+            
+            // 显示结果
+            displayResults(results);
+        }
+        
+        // 搜索游戏（管理员后台）
+        function adminSearchGames() {
+            const searchTerm = adminSearchInput.value.trim();
+            
+            if (!searchTerm) {
+                showNotification('请输入信息', false);
+                return;
+            }
+            
+            // 清空之前的结果
+            adminResultsList.innerHTML = '';
+            
+            // 执行搜索
+            const results = performSearch(searchTerm);
+            
+            // 显示管理员搜索结果
+            displayAdminResults(results);
+        }
+        
+        // 执行搜索逻辑（共用）
+        function performSearch(searchTerm) {
+            // 检查是否是数字（可能是编号搜索）
+            const isNumberSearch = /^\d+$/.test(searchTerm);
+            let results = [];
+            
+            if (isNumberSearch) {
+                // 编号搜索 - 处理包含冒号的情况
+                results = gameData.filter(game => {
+                    const gameId = String(game['游戏编号']);
+                    const searchId = searchTerm.padStart(5, '0');
+                    
+                    // 检查是否包含冒号
+                    if (gameId.includes(':')) {
+                        // 分割为冒号前后两部分
+                        const [part1, part2] = gameId.split(':', 2);
+                        
+                        // 检查两部分是否有5位数字匹配
+                        const part1Match = part1 && hasFiveMatchingDigits(part1.padStart(5, '0'), searchId);
+                        const part2Match = part2 && hasFiveMatchingDigits(part2.padStart(5, '0'), searchId);
+                        
+                        return part1Match || part2Match;
+                    } else {
+                        // 不包含冒号的情况，直接检查
+                        return hasFiveMatchingDigits(gameId.padStart(5, '0'), searchId);
+                    }
+                });
+            } else {
+                // 名称搜索 - 模糊匹配
+                const searchLower = searchTerm.toLowerCase();
+                results = gameData.filter(game => 
+                    String(game['游戏名字']).toLowerCase().includes(searchLower)
+                );
+            }
+            
+            return results;
+        }
+        
+        // 显示前台搜索结果
+        function displayResults(results) {
+            noDataMessage.classList.add('hidden');
+            noResultsMessage.classList.add('hidden');
+            resultsContainer.classList.add('hidden');
+            
+            if (results.length === 0) {
+                noResultsMessage.classList.remove('hidden');
+                return;
+            }
+            
+            // 显示结果
+            resultsContainer.classList.remove('hidden');
+            resultsCount.textContent = `找到 ${results.length} 条匹配结果`;
+            
+            // 添加结果到列表
+            results.forEach((game, index) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'result-item bg-gray-50 p-3 rounded-r-lg hover:bg-gray-100 transition-colors opacity-0 transform translate-y-2';
+                resultItem.style.transition = `opacity 0.3s ease ${index * 0.05}s, transform 0.3s ease ${index * 0.05}s`;
+                
+                // 分行显示每个字段
+                resultItem.innerHTML = `
+                    <div class="mb-1"><span class="text-xs text-gray-500">游戏编号：</span><span class="text-sm">${game['游戏编号'] || '-'}</span></div>
+                    <div class="mb-1"><span class="text-xs text-gray-500">游戏名字：</span><span class="text-sm font-medium">${game['游戏名字'] || '-'}</span></div>
+                    <div class="mb-1"><span class="text-xs text-gray-500">战力：</span><span class="text-sm">${game['战力'] || '-'}</span></div>
+                    <div><span class="text-xs text-gray-500">所在州：</span><span class="text-sm">${game['所在州'] || '-'}</span></div>
+                `;
+                
+                resultsList.appendChild(resultItem);
+                
+                // 触发动画
+                setTimeout(() => {
+                    resultItem.style.opacity = '1';
+                    resultItem.style.transform = 'translateY(0)';
+                }, 50);
+            });
+        }
+        
+        // 显示管理员搜索结果（带删除按钮）
+        function displayAdminResults(results) {
+            adminNoResultsMessage.classList.add('hidden');
+            adminResultsContainer.classList.add('hidden');
+            
+            if (results.length === 0) {
+                adminNoResultsMessage.classList.remove('hidden');
+                return;
+            }
+            
+            // 显示结果
+            adminResultsContainer.classList.remove('hidden');
+            adminResultsCount.textContent = `找到 ${results.length} 条匹配结果，点击条目可删除`;
+            
+            // 添加结果到列表
+            results.forEach((game, index) => {
+                const resultItem = document.createElement('div');
+                resultItem.className = 'admin-result-item bg-gray-50 p-3 rounded-r-lg hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer opacity-0 transform translate-y-2 border border-transparent';
+                resultItem.style.transition = `opacity 0.3s ease ${index * 0.05}s, transform 0.3s ease ${index * 0.05}s`;
+                
+                // 点击事件 - 触发删除确认
+                resultItem.addEventListener('click', () => {
+                    showDeleteConfirmModal(game);
+                });
+                
+                // 分行显示每个字段，添加删除图标
+                resultItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1 pr-2">
+                            <div class="mb-1"><span class="text-xs text-gray-500">游戏编号：</span><span class="text-sm">${game['游戏编号'] || '-'}</span></div>
+                            <div class="mb-1"><span class="text-xs text-gray-500">游戏名字：</span><span class="text-sm font-medium">${game['游戏名字'] || '-'}</span></div>
+                            <div class="mb-1"><span class="text-xs text-gray-500">战力：</span><span class="text-sm">${game['战力'] || '-'}</span></div>
+                            <div><span class="text-xs text-gray-500">所在州：</span><span class="text-sm">${game['所在州'] || '-'}</span></div>
+                        </div>
+                        <div class="text-danger opacity-70">
+                            <i class="fa fa-trash-o"></i>
+                        </div>
+                    </div>
+                `;
+                
+                adminResultsList.appendChild(resultItem);
+                
+                // 触发动画
+                setTimeout(() => {
+                    resultItem.style.opacity = '1';
+                    resultItem.style.transform = 'translateY(0)';
+                }, 50);
+            });
+        }
+        
+        // 重置搜索结果
+        function resetSearchResults() {
+            searchInput.value = '';
+            resultsList.innerHTML = '';
+            resultsContainer.classList.add('hidden');
+            noResultsMessage.classList.add('hidden');
+            noDataMessage.classList.remove('hidden');
+            searchInput.focus();
+        }
+        
+        // 事件监听器
+        // 管理员相关
+        adminButton.addEventListener('click', showAdminPasswordModal);
+        
+        confirmAdminPassword.addEventListener('click', () => {
+            const password = adminPasswordInput.value.trim();
+            if (verifyAdminPassword(password)) {
+                showAdminPanel();
+            } else {
+                adminPasswordError.classList.remove('hidden');
+                adminPasswordInput.focus();
+            }
+        });
+        
+        cancelAdminPassword.addEventListener('click', hideAdminPasswordModal);
+        
+        adminPasswordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                confirmAdminPassword.click();
+            }
+        });
+        
+        closeAdminPanel.addEventListener('click', hideAdminPanel);
+        
+        // 手动添加数据
+        addManualData.addEventListener('click', addManualRecord);
+        resetManualForm.addEventListener('click', resetManualFormFields);
+        
+        // 为手动添加表单添加回车提交功能
+        [manualGameId, manualGameName, manualPower, manualState].forEach(input => {
+            input.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    addManualData.click();
+                }
+            });
+        });
+        
+        // 管理员搜索删除功能
+        adminSearchButton.addEventListener('click', adminSearchGames);
+        
+        adminSearchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                adminSearchButton.click();
+            }
+        });
+        
+        // 删除确认
+        confirmDelete.addEventListener('click', executeDelete);
+        cancelDelete.addEventListener('click', hideDeleteConfirmModal);
+        
+        // 导入错误提示
+        closeImportError.addEventListener('click', hideImportError);
+        
+        // 管理员文件上传
+        adminDropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            adminDropArea.classList.add('file-drop-active');
+        });
+        
+        adminDropArea.addEventListener('dragleave', () => {
+            adminDropArea.classList.remove('file-drop-active');
+        });
+        
+        adminDropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            adminDropArea.classList.remove('file-drop-active');
+            
+            if (e.dataTransfer.files.length) {
+                const file = e.dataTransfer.files[0];
+                handleAdminFileSelection(file);
+            }
+        });
+        
+        adminDropArea.addEventListener('click', () => {
+            adminFileInput.click();
+        });
+        
+        adminFileInput.addEventListener('change', () => {
+            if (adminFileInput.files.length) {
+                const file = adminFileInput.files[0];
+                handleAdminFileSelection(file);
+            }
+        });
+        
+        adminRemoveFile.addEventListener('click', removeAdminFile);
+        
+        confirmImport.addEventListener('click', importExcelData);
+        
+        // 前台搜索相关
+        searchButton.addEventListener('click', searchGames);
+        
+        clearSearch.addEventListener('click', resetSearchResults);
+        
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchGames();
+            }
+        });
+        
+        // 页面加载完成后自动聚焦到搜索框
+        window.addEventListener('load', () => {
+            searchInput.focus();
+            // 显示数据加载成功的提示
+            showNotification(`已加载 ${gameData.length} 条数据`);
+        });
+        
+        // 处理窗口大小变化，优化移动端体验
+        window.addEventListener('resize', () => {
+            // 确保弹窗在窗口大小变化时保持居中
+            const modals = [adminPasswordModal, adminPanel, deleteConfirmModal, importErrorModal];
+            modals.forEach(modal => {
+                if (!modal.classList.contains('hidden')) {
+                    modal.style.display = 'none';
+                    setTimeout(() => {
+                        modal.style.display = 'flex';
+                    }, 10);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
