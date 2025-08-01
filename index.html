@@ -1,1155 +1,749 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>七岚州名单查询系统</title>
-    <!-- 引入Tailwind CSS -->
+    <title>人员名单查询系统 - 七揽星收录</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入Font Awesome -->
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <!-- 引入SheetJS用于处理Excel文件 -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    
-    <!-- 配置Tailwind自定义颜色和字体 -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        primary: '#3B82F6',
-                        secondary: '#10B981',
-                        accent: '#6366F1',
-                        danger: '#EF4444',
-                        dark: '#1E293B',
-                        light: '#F8FAFC'
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'system-ui', 'sans-serif'],
-                    },
-                }
-            }
-        }
-    </script>
-    
     <style type="text/tailwindcss">
         @layer utilities {
             .content-auto {
                 content-visibility: auto;
             }
-            .shadow-soft {
-                box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            .search-container {
+                @apply max-w-3xl mx-auto;
             }
             .result-item {
-                border-left: 3px solid #3B82F6;
+                @apply p-4 border-b border-gray-200 hover:bg-gray-50 transition-colors;
             }
-            .admin-result-item {
-                border-left: 3px solid #6366F1;
-            }
-            .backdrop-blur {
-                backdrop-filter: blur(8px);
-            }
-            .file-drop-active {
-                @apply border-primary bg-blue-50;
+            .highlight {
+                @apply bg-yellow-200 px-1 rounded;
             }
         }
     </style>
 </head>
-<body class="bg-gray-50 font-sans text-dark min-h-screen">
-    <!-- 限制最大宽度为手机尺寸，居中显示 -->
-    <div class="max-w-md mx-auto w-full px-4 py-6 bg-white min-h-screen">
-        <!-- 页面标题 -->
-        <header class="text-center mb-6">
-            <h1 class="text-[clamp(1.5rem,5vw,2.5rem)] font-bold text-primary mb-2 tracking-tight">
-                <i class="fa fa fa-list-alt mr-2"></i>七岚州名单查询系统
-            </h1>
-            <p class="text-gray-600 text-sm md:text-base italic">
-                七揽星出品必属精品
-            </p>
+
+<body class="bg-gray-50 font-sans">
+    <div class="container mx-auto px-4 py-8 max-w-6xl">
+        <header class="text-center mb-10">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">人员名单查询系统</h1>
+            <p class="text-xl text-gray-600">七揽星收录</p>
         </header>
-        
-        <!-- 后台管理按钮 -->
-        <div class="text-right mb-4">
-            <button id="adminButton" class="text-xs text-gray-500 hover:text-primary transition-colors flex items-center justify-end">
-                <i class="fa fa-cog mr-1"></i> 后台管理
-            </button>
-        </div>
-        
-        <!-- 主要内容区 -->
-        <main class="space-y-6">
-            <!-- 搜索区域 -->
-            <section class="bg-white rounded-xl shadow-soft p-5 transition-all duration-300 hover:shadow-lg border border-gray-100">
-                <h2 class="text-lg font-semibold mb-3 flex items-center">
-                    <i class="fa fa-search text-accent mr-2"></i>输入信息
-                </h2>
-                <div class="flex flex-col gap-3">
-                    <div class="w-full">
-                        <label for="searchInput" class="block text-sm font-medium text-gray-700 mb-1">
-                            游戏名称或编号
-                        </label>
-                        <div class="relative">
-                            <input 
-                                type="text" 
-                                id="searchInput" 
-                                placeholder="请输入..." 
-                                class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
-                            >
-                            <button id="searchButton" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary text-white p-1 rounded hover:bg-primary/90 transition-colors">
-                                <i class="fa fa-search"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="flex justify-start">
-                        <button id="clearSearch" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                            <i class="fa fa-refresh mr-1"></i> 清空
-                        </button>
-                    </div>
-                </div>
-            </section>
-            
-            <!-- 结果展示区域 -->
-            <section class="bg-white rounded-xl shadow-soft p-5 transition-all duration-300 hover:shadow-lg border border-gray-100">
-                <h2 class="text-lg font-semibold mb-3 flex items-center">
-                    <i class="fa fa-table text-accent mr-2"></i>查询结果
-                </h2>
-                <div id="noDataMessage" class="text-center py-8 text-gray-500">
-                    <i class="fa fa-database text-3xl mb-2 opacity-30"></i>
-                    <p class="text-sm">请输入信息查询</p>
-                </div>
-                <div id="noResultsMessage" class="text-center py-8 text-gray-500 hidden">
-                    <i class="fa fa-search text-3xl mb-2 opacity-30"></i>
-                    <p class="text-sm">未找到匹配信息</p>
-                </div>
-                <div id="resultsContainer" class="hidden">
-                    <!-- 结果数量统计 -->
-                    <div class="mt-1 mb-3 text-xs text-gray-500">
-                        <span id="resultsCount"></span>
-                    </div>
-                    
-                    <!-- 结果列表（分行显示） -->
-                    <div id="resultsList" class="space-y-3">
-                        <!-- 结果项将在这里动态动态生成 -->
-                    </div>
-                </div>
-            </section>
-        </main>
-        
-        <!-- 页脚 -->
-        <footer class="mt-8 text-center text-gray-500 text-xs">
-            <p>© 七揽星出品</p>
-        </footer>
-    </div>
-    
-    <!-- 管理员密码弹窗 -->
-    <div id="adminPasswordModal" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-xl p-5 max-w-xs w-full mx-4 transform scale-95 transition-transform duration-300">
-            <h3 class="text-base font-semibold mb-3 flex items-center">
-                <i class="fa fa-lock text-accent mr-2"></i> 管理员验证
-            </h3>
-            <p class="text-gray-600 text-sm mb-3">请输入管理员密码</p>
-            <div class="mb-3">
-                <label for="adminPasswordInput" class="block text-xs font-medium text-gray-700 mb-1">密码</label>
+
+        <div class="search-container bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex flex-col md:flex-row gap-3">
                 <input 
-                    type="password" 
-                    id="adminPasswordInput" 
-                    placeholder="请输入密码" 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
+                    type="text" 
+                    id="searchTerm" 
+                    placeholder="请输入游戏编号(5位数字)或游戏名字"
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
                 >
-            </div>
-            <div class="text-red-500 text-xs mb-3 hidden" id="adminPasswordError">
-                <i class="fa fa-exclamation-circle mr-1"></i> 密码错误，请重新输入
-            </div>
-            <div class="flex justify-end gap-2">
-                <button id="cancelAdminPassword" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                    取消
+                <button 
+                    id="searchBtn" 
+                    onclick="search()"
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                    <i class="fa fa-search"></i>
+                    <span>查询</span>
                 </button>
-                <button id="confirmAdminPassword" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm">
-                    确认
+                <button 
+                    id="clearBtn" 
+                    onclick="clearSearch()"
+                    class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-6 py-3 rounded-lg transition-colors"
+                >
+                    清空
                 </button>
             </div>
-        </div>
-    </div>
-    
-    <!-- 删除确认弹窗 -->
-    <div id="deleteConfirmModal" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-60 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-xl p-5 max-w-xs w-full mx-4 transform scale-95 transition-transform duration-300">
-            <h3 class="text-base font-semibold mb-3 flex items-center text-danger">
-                <i class="fa fa-exclamation-triangle mr-2"></i> 确认删除
-            </h3>
-            <p class="text-gray-600 text-sm mb-4" id="deleteConfirmMessage">
-                您确定要删除这条数据吗？此操作不可撤销。
+            <p class="text-sm text-gray-500 mt-3">
+                <i class="fa fa-info-circle"></i> 游戏编号只要有5位数字匹配即可查询，游戏名字只要有一个字符匹配即可查询
             </p>
-            <div class="flex justify-end gap-2">
-                <button id="cancelDelete" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                    取消
-                </button>
-                <button id="confirmDelete" class="px-3 py-1.5 bg-danger text-white rounded-lg hover:bg-danger/90 transition-colors text-sm">
-                    确认删除
-                </button>
+        </div>
+
+        <div id="result" class="bg-white rounded-lg shadow-md p-6 min-h-[200px]">
+            <div class="text-center text-gray-500 py-10" id="initialMessage">
+                <i class="fa fa-search-plus text-4xl mb-3 opacity-30"></i>
+                <p>请输入查询关键词开始搜索</p>
             </div>
         </div>
-    </div>
-    
-    <!-- 导入错误提示弹窗 -->
-    <div id="importErrorModal" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-60 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-xl p-5 max-w-xs w-full mx-4 transform scale-95 transition-transform duration-300">
-            <h3 class="text-base font-semibold mb-3 flex items-center text-danger">
-                <i class="fa fa-exclamation-circle mr-2"></i> 导入失败
-            </h3>
-            <div id="importErrorMessage" class="text-gray-600 text-sm mb-4 max-h-[200px] overflow-y-auto pr-2">
-                <!-- 错误信息将在这里显示 -->
-            </div>
-            <div class="flex justify-end">
-                <button id="closeImportError" class="px-3 py-1.5 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm">
-                    我知道了
-                </button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 管理员操作界面 -->
-    <div id="adminPanel" class="fixed inset-0 bg-black/50 backdrop-blur flex items-center justify-center z-50 hidden opacity-0 transition-opacity duration-300">
-        <div class="bg-white rounded-xl shadow-xl p-5 max-w-md w-full mx-4 transform scale-95 transition-transform duration-300 max-h-[90vh] overflow-y-auto">
-            <h3 class="text-base font-semibold mb-3 flex items-center">
-                <i class="fa fa-cogs text-accent mr-2"></i> 后台管理
-            </h3>
-            
-            <!-- 手动添加数据表单 -->
-            <div class="mb-6 pb-6 border-b border-gray-200">
-                <h4 class="font-medium text-sm mb-3">手动添加数据</h4>
-                <div class="space-y-3">
-                    <div>
-                        <label for="manualGameId" class="block text-xs font-medium text-gray-700 mb-1">游戏编号 <span class="text-red-500">*</span></label>
-                        <input 
-                            type="text" 
-                            id="manualGameId" 
-                            placeholder="请输入游戏编号" 
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
-                        >
-                    </div>
-                    <div>
-                        <label for="manualGameName" class="block text-xs font-medium text-gray-700 mb-1">游戏名字 <span class="text-red-500">*</span></label>
-                        <input 
-                            type="text" 
-                            id="manualGameName" 
-                            placeholder="请输入游戏名字" 
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
-                        >
-                    </div>
-                    <div>
-                        <label for="manualPower" class="block text-xs font-medium text-gray-700 mb-1">战力 <span class="text-red-500">*</span></label>
-                        <input 
-                            type="number" 
-                            id="manualPower" 
-                            placeholder="请输入战力值" 
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
-                        >
-                    </div>
-                    <div>
-                        <label for="manualState" class="block text-xs font-medium text-gray-700 mb-1">所在州 <span class="text-red-500">*</span></label>
-                        <input 
-                            type="text" 
-                            id="manualState" 
-                            placeholder="请输入所在州" 
-                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all outline-none text-sm"
-                        >
-                    </div>
-                    <div class="flex justify-end mt-2">
-                        <button id="resetManualForm" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm mr-2">
-                            重置
-                        </button>
-                        <button id="addManualData" class="px-3 py-1.5 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors text-sm">
-                            <i class="fa fa-plus mr-1"></i> 添加数据
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 搜索删除数据功能 -->
-            <div class="mb-6 pb-6 border-b border-gray-200">
-                <h4 class="font-medium text-sm mb-3">搜索并删除数据</h4>
-                <p class="text-gray-600 text-xs mb-3">搜索出结果后，点击对应项即可删除</p>
-                
-                <!-- 搜索区域 -->
-                <div class="mb-4">
-                    <div class="relative">
-                        <input 
-                            type="text" 
-                            id="adminSearchInput" 
-                            placeholder="输入游戏名称或编号搜索..." 
-                            class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-accent focus:border-accent transition-all outline-none text-sm"
-                        >
-                        <button id="adminSearchButton" class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-accent text-white p-1 rounded hover:bg-accent/90 transition-colors">
-                            <i class="fa fa-search"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- 结果展示区域 -->
-                <div>
-                    <div id="adminNoResultsMessage" class="text-center py-6 text-gray-500 hidden">
-                        <i class="fa fa-search text-2xl mb-2 opacity-30"></i>
-                        <p class="text-xs">未找到匹配信息</p>
-                    </div>
-                    <div id="adminResultsContainer" class="hidden">
-                        <!-- 结果数量统计 -->
-                        <div class="mt-1 mb-3 text-xs text-gray-500">
-                            <span id="adminResultsCount"></span>
-                        </div>
-                        
-                        <!-- 结果列表 -->
-                        <div id="adminResultsList" class="space-y-3 max-h-[200px] overflow-y-auto pr-1">
-                            <!-- 结果项将在这里动态生成 -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Excel导入功能 -->
-            <div>
-                <h4 class="font-medium text-sm mb-3">批量导入数据</h4>
-                <p class="text-gray-600 text-xs mb-4">导入Excel表格批量更新查询数据（第一行需为：游戏编号，游戏名字，战力，所在州）</p>
-                
-                <div id="adminDropArea" class="border-2 border-dashed border-gray-300 rounded-lg p-5 text-center cursor-pointer transition-all duration-300 hover:border-primary mb-4">
-                    <i class="fa fa-file-excel-o text-4xl text-secondary mb-3"></i>
-                    <p class="mb-2 text-sm">点击选择文件或拖放文件到此处</p>
-                    <label class="bg-primary hover:bg-primary/90 text-white py-2 px-4 rounded-lg inline-block transition-all duration-300 cursor-pointer text-sm">
-                        <span>选择Excel文件</span>
-                        <input type="file" id="adminFileInput" accept=".xlsx, .xls" class="hidden">
-                    </label>
-                    <p class="text-xs text-gray-500 mt-3">支持的格式: .xlsx, .xls</p>
-                </div>
-                
-                <div id="adminFileInfo" class="mt-3 mb-4 hidden">
-                    <div class="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                        <div class="flex items-center overflow-hidden">
-                            <i class="fa fa-file-text-o text-accent mr-2 flex-shrink-0"></i>
-                            <span id="adminFileName" class="font-medium text-sm truncate"></span>
-                        </div>
-                        <button id="adminRemoveFile" class="text-red-500 hover:text-red-700 transition-colors">
-                            <i class="fa fa-times"></i>
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- 导入进度提示 -->
-                <div id="importProgress" class="hidden mb-4 text-center">
-                    <div class="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                    <p class="text-xs text-gray-500 mt-2">正在解析文件，请稍候...</p>
-                </div>
-                
-                <div class="flex justify-end gap-2">
-                    <button id="closeAdminPanel" class="px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm">
-                        关闭
-                    </button>
-                    <button id="confirmImport" class="px-3 py-1.5 bg-secondary text-white rounded-lg hover:bg-secondary/90 transition-colors text-sm" disabled>
-                        <i class="fa fa-upload mr-1"></i> 确认导入
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 通知提示组件 -->
-    <div id="notification" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg translate-y-20 opacity-0 transition-all duration-300 flex items-center max-w-xs w-full">
-        <i id="notificationIcon" class="mr-2"></i>
-        <span id="notificationMessage" class="text-sm"></span>
     </div>
 
     <script>
-        // 从本地存储加载数据，如果没有则使用初始数据
-        let gameData = loadDataFromStorage() || [
-            {"游戏编号": "749803924", "游戏名字": "洛挽尘", "战力": 2033, "所在州": "六合主州"},
-            {"游戏编号": "11541:756356949", "游戏名字": "/嗨吧舞吧", "战力": 2833, "所在州": "六合主州"},
-            {"游戏编号": "11444:749997510", "游戏名字": "☆舞吧嗨吧", "战力": 2777, "所在州": "六合主州"},
-            {"游戏编号": "11555:757269570", "游戏名字": "弄花", "战力": 2751, "所在州": "六合主州"},
-            {"游戏编号": "11692:766250360", "游戏名字": "༄剧情", "战力": 2681, "所在州": "六合主州"},
-            {"游戏编号": "12029:788334791", "游戏名字": "大老虎", "战力": 2632, "所在州": "六合主州"},
-            {"游戏编号": "11518:754846587", "游戏名字": "/奋★斗", "战力": 2423, "所在州": "六合主州"},
-            {"游戏编号": "12022:787879622", "游戏名字": "明日香", "战力": 2304, "所在州": "六合主州"},
-            {"游戏编号": "11702:766906797", "游戏名字": "抱歉", "战力": 2212, "所在州": "六合主州"},
-            {"游戏编号": "11443:749935082", "游戏名字": "我五岁了吖", "战力": 2153, "所在州": "六合主州"}
+        // 全部游戏数据
+        const gameData = [
+            ["749803924", "洛挽尘", 2033, "六合主州"],
+            ["11541:756356949", "/嗨吧舞吧", 2833, "六合主州"],
+            ["11444:749997510", "☆舞吧嗨吧", 2777, "六合主州"],
+            ["11555:757269570", "弄花", 2751, "六合主州"],
+            ["11692:766250360", "༄剧情", 2681, "六合主州"],
+            ["12029:788334791", "大老虎", 2632, "六合主州"],
+            ["11518:754846587", "/奋★斗", 2423, "六合主州"],
+            ["12022:787879622", "明日香", 2304, "六合主州"],
+            ["11702:766906797", "抱歉", 2212, "六合主州"],
+            ["11443:749935082", "我五岁了吖", 2153, "六合主州"],
+            ["11544:756550049", "/团子超凶", 2069, "六合主州"],
+            ["12029:788334791", "安静", 2041, "六合主州"],
+            ["11776:771755522", "/九州灬", 2029, "六合主州"],
+            ["11720:768087953", "持盈保泰", 1963, "六合主州"],
+            ["12100:792990715", "薛浩歌", 1948, "六合主州"],
+            ["12059:790304540", "古天", 1915, "六合主州"],
+            ["11466:751439194", "阿飒", 1906, "六合主州"],
+            ["11544:756554144", "不醉ོ不归", 1905, "六合主州"],
+            ["11471:751764643", "❀ㅤ斜月", 1898, "六合主州"],
+            ["11636:762583517", "出号", 1889, "六合主州"],
+            ["11465:751376592", "尊冷眸", 1884, "六合主州"],
+            ["11473:751898743", "目中無人", 1863, "六合主州"],
+            ["11773:771556414", "六月。", 1861, "六合主州"],
+            ["12012:787223872", "♔拜月♔", 1857, "六合主州"],
+            ["12001:786498608", "清澈", 1857, "六合主州"],
+            ["11475:752028239", "叶", 1852, "六合主州"],
+            ["12088:792202016", "逍遥.", 1829, "六合主州"],
+            ["11437:749538937", "❀断桥", 1814, "六合主州"],
+            ["11693:766317162", "༄许宛白", 1812, "六合主州"],
+            ["11958:783681132", "醉酒书生", 1812, "六合主州"],
+            ["11548:756816381", "长安北望", 1811, "六合主州"],
+            ["11770:771359821", "☆荒", 1793, "六合主州"],
+            ["11834:775558633", "有缘人", 1790, "六合主州"],
+            ["11517:754779757", "心中有山海", 1774, "六合主州"],
+            ["11639:762775308", "❀红鑫", 1748, "六合主州"],
+            ["11443:749929514", "你午睡了吗", 1740, "六合主州"],
+            ["11472:751832183", "大自在", 1707, "六合主州"],
+            ["11767:771163251", "❀ㅤ番茄", 1701, "六合主州"],
+            ["11696:766514695", "☆万里层云", 1694, "六合主州"],
+            ["11979:785058874", "小李飞刀", 1690, "六合主州"],
+            ["11453:750586820", "柳书", 1690, "六合主州"],
+            ["11538:756158710", "/暮而归࿐", 1685, "六合主州"],
+            ["12090:792331398", "山海皆可平", 1682, "六合主州"],
+            ["11474:751965678", "川", 1681, "六合主州"],
+            ["11556:757339249", "围城", 1681, "六合主州"],
+            ["11548:756815896", "安逸的鱼", 1666, "六合主州"],
+            ["11469:751638312", "初见卿心", 1657, "六合主州"],
+            ["11456:750785113", "还行", 1645, "六合主州"],
+            ["12025:788071533", "铃铛", 1638, "六合主州"],
+            ["11611:760940686", "森与鹿迷.", 1627, "六合主州"],
+            ["11596:759959167", "颜颜", 1599, "六合主州"],
+            ["11425:748750902", "༄叶观", 1590, "六合主州"],
+            ["11550:756941875", "叼炸天", 1571, "六合主州"],
+            ["11765:771034537", "☆baby", 1569, "六合主州"],
+            ["11439:749668435", "❀南方嘉木", 1553, "六合主州"],
+            ["11562:757730952", "༄醉清风", 1552, "六合主州"],
+            ["11586:759302202", "❀谛仙", 1523, "六合主州"],
+            ["11735:769067384", "三页书", 1522, "六合主州"],
+            ["11761:770774279", "☆安止", 1520, "六合主州"],
+            ["11590:759568439", "☆帝天龍皇", 1515, "六合主州"],
+            ["11582:759042469", "来₂", 1512, "六合主州"],
+            ["12020:787748850", "壹", 1512, "六合主州"],
+            ["11639:762778123", "山野", 1509, "六合主州"],
+            ["11996:786171307", "吞天神蚁", 1498, "六合主州"],
+            ["11516:754717019", "☆风吹年年", 1495, "六合主州"],
+            ["11415:748096315", "❀ㅤ云倦倦", 1492, "六合主州"],
+            ["11958:783685146", "柠檬书生", 1492, "六合主州"],
+            ["11450:750388757", "/繁城之上", 1487, "六合主州"],
+            ["11979:785056803", "会飞的喵z", 1486, "六合主州"],
+            ["11958:783680509", "壹介书生", 1455, "六合主州"],
+            ["11588:759432824", "/朝而往࿐", 1447, "六合主州"],
+            ["11456:750783331", "林七七", 1421, "六合主州"],
+            ["11586:759305793", "通云·刺眼", 1419, "六合主州"],
+            ["12010:787088662", "洛璃", 1411, "六合主州"],
+            ["11456:750781507", "菡萏", 1409, "六合主州"],
+            ["11454:750652572", "小核桃", 1394, "六合主州"],
+            ["11739:769331241", "☆江山", 1393, "六合主州"],
+            ["11763:770903224", "短笛", 1344, "六合主州"],
+            ["11739:769329240", "☆一旧云", 1291, "六合主州"],
+            ["11555:757274350", "❀千金橘子", 1265, "六合主州"],
+            ["11447:750192583", "༄鬼夫子", 1173, "六合主州"],
+            ["11449:750324720", "/St皮皮", 1170, "六合主州"],
+            ["11888:779093303", "不悔ོ梦归", 1079, "六合主州"],
+            ["11451:750458871", "麻辣", 2127, "六合空谷"],
+            ["11927:781653578", "白川", 1743, "六合空谷"],
+            ["11442:749867416", "邋遢小师叔", 1740, "六合空谷"],
+            ["11432:749209019", "ʚ多喝热水", 1722, "六合空谷"],
+            ["11924:781453466", "梦幻任逍遥", 1632, "六合空谷"],
+            ["11924:781455127", "师太请留步", 1534, "六合空谷"],
+            ["11442:749865497", "嗨♛土哥们", 1530, "六合空谷"],
+            ["11439:749672319", "今世缘", 1508, "六合空谷"],
+            ["11938:782372303", "云飞铁宝", 1480, "六合空谷"],
+            ["11594:759829642", "玄鲤渡厄", 1471, "六合空谷"],
+            ["11441:749803519", "仰簇", 1469, "六合空谷"],
+            ["11439:749667312", "酷酷", 1447, "六合空谷"],
+            ["11758:770573309", "良田吃枣丸", 1443, "六合空谷"],
+            ["11596:759956523", "一忧子", 1438, "六合空谷"],
+            ["11521:755045396", "铁★天泪星", 1431, "六合空谷"],
+            ["11431:749148764", "严于律己", 1392, "六合空谷"],
+            ["11942:782635627", "张帅比", 1383, "六合空谷"],
+            ["11924:781452715", "猛男小胖", 1361, "六合空谷"],
+            ["11947:782963944", "鱼轻逐影游", 1357, "六合空谷"],
+            ["11468:751570982", "以身作则", 1330, "六合空谷"],
+            ["11443:749934640", "早点睡觉ɞ", 1298, "六合空谷"],
+            ["11443:749931272", "听水闲行", 1293, "六合空谷"],
+            ["11531:755698406", "泸州老窖", 1289, "六合空谷"],
+            ["11516:754719307", "吸猫小居士", 1269, "六合空谷"],
+            ["11451:750458148", "虞允文", 1269, "六合空谷"],
+            ["11503:753866152", "糖醋蒜", 1266, "六合空谷"],
+            ["11641:762909050", "岁岁", 1212, "六合空谷"],
+            ["11432:749210405", "春风小沙弥", 1201, "六合空谷"],
+            ["11442:749864777", "僧厨睿睿", 1155, "六合空谷"],
+            ["11427:748881761", "小锄头", 1106, "六合空谷"],
+            ["11435:749407917", "精神小蛙", 1099, "六合空谷"],
+            ["11550:756947790", "悠悠大和尚", 1098, "六合空谷"],
+            ["11938:782370519", "拾光时光", 1095, "六合空谷"],
+            ["11936:782239690", "叶俢", 1091, "六合空谷"],
+            ["11940:782504938", "慕、柴人", 1080, "六合空谷"],
+            ["11445:750064567", "小卡拉米", 1072, "六合空谷"],
+            ["11921:781258662", "帅比潘安", 1066, "六合空谷"],
+            ["11445:750065628", "钢棍解师傅", 1052, "六合空谷"],
+            ["11459:750979558", "狗别谈恋爱", 1045, "六合空谷"],
+            ["11539:756224570", "一封情书", 1040, "六合空谷"],
+            ["11452:750523202", "天爱星", 1015, "六合空谷"],
+            ["11426:748815541", "鱼卿", 1004, "六合空谷"],
+            ["11442:749868905", "小鸡炖蘑菇", 1000, "六合空谷"],
+            ["11925:781519378", "健身青年", 973, "六合空谷"],
+            ["11445:750066041", "潘延", 936, "六合空谷"],
+            ["11945:782831259", "潇潇", 928, "六合空谷"],
+            ["11945:782830553", "风细水纹起", 915, "六合空谷"],
+            ["11450:750393675", "墨卿", 911, "六合空谷"],
+            ["11446:750131527", "禅师苗苗", 897, "六合空谷"],
+            ["11698:766643642", "安欣", 896, "六合空谷"],
+            ["11266:738335166", "小龙虾", 868, "六合空谷"],
+            ["11694:766382499", "灯火阑珊", 838, "六合空谷"],
+            ["11445:750065297", "柏笙", 834, "六合空谷"],
+            ["11552:757077820", "西睿", 820, "六合空谷"],
+            ["11438:749603929", "寒冰铁宝", 816, "六合空谷"],
+            ["11441:749802078", "夏至", 812, "六合空谷"],
+            ["11928:781714433", "贫尼静白", 805, "六合空谷"],
+            ["11538:756157265", "任冠", 804, "六合空谷"],
+            ["11947:782962321", "静白的AK", 798, "六合空谷"],
+            ["11477:752161852", "酷酷哒铁子", 798, "六合空谷"],
+            ["11511:754387216", "清酒", 787, "六合空谷"],
+            ["11925:781521845", "逆风飞翔", 760, "六合空谷"],
+            ["11487:752816394", "月亮小元君", 757, "六合空谷"],
+            ["11921:781259952", "尚黎", 733, "六合空谷"],
+            ["11653:763692616", "藏经阁修猫", 717, "六合空谷"],
+            ["11936:782243064", "夜雨", 705, "六合空谷"],
+            ["11451:750454678", "烟雨༒怜梦", 689, "六合空谷"],
+            ["11536:756028747", "凝妖妖㎥", 623, "六合空谷"],
+            ["11700:766776919", "肥膘大将军", 615, "六合空谷"],
+            ["11424:748686849", "犀角拂尘", 612, "六合空谷"],
+            ["11647:763303847", "第二信使", 592, "六合空谷"],
+            ["11532:755767661", "虾仁蛋饺", 539, "六合空谷"],
+            ["11458:750916485", "暮雪", 478, "六合空谷"],
+            ["11506:754061738", "师父请保重", 467, "六合空谷"],
+            ["11914:780801479", "养铁小道童", 406, "六合空谷"],
+            ["11710:767430558", "帅比月", 327, "六合空谷"],
+            ["787944008", "天少", 0, "原灵异州"],
+            ["783680509", "诸葛太白", 0, "原灵异州"],
+            ["783681132", "诸葛聆风", 0, "原灵异州"],
+            ["783685146", "诸葛菜馍", 0, "原灵异州"],
+            ["783549836", "诸葛青雨", 0, "原灵异州"],
+            ["783877139", "彼采萧兮", 0, "原灵异州"],
+            ["783484364", "诸葛不寒", 0, "原灵异州"],
+            ["787678571", "浔、析木", 0, "原灵异州"],
+            ["787220797", "乔乔", 0, "原灵异州"],
+            ["783816452", "再睡一夏", 0, "原灵异州"],
+            ["787547746", "王佛", 0, "原灵异州"],
+            ["757470637", "暮归", 0, "原灵异州"],
+            ["787680867", "浔、龙腾", 0, "原灵异州"],
+            ["787649234", "孤寡本寡", 0, "原灵异州"],
+            ["787876259", "苍·嘟嘟", 0, "原灵异州"],
+            ["783680803", "诸葛大白", 0, "原灵异州"],
+            ["790168585", "落落崽", 0, "原灵异州"],
+            ["783682433", "月、钱圣", 0, "原灵异州"],
+            ["785777648", "挤压筒", 0, "原灵异州"],
+            ["783289444", "月、余真", 0, "原灵异州"],
+            ["783879058", "阿里多多", 0, "原灵异州"],
+            ["783684431", "盛、漏", 0, "原灵异州"],
+            ["787550901", "安红额想你", 0, "原灵异州"],
+            ["786960623", "辰", 0, "原灵异州"],
+            ["787680757", "浔、花小钱", 0, "原灵异州"],
+            ["783684501", "烽火", 0, "原灵异州"],
+            ["787813575", "浔、七愿", 0, "原灵异州"],
+            ["787548414", "葡萄本萄", 0, "原灵异州"],
+            ["783616132", "娱樂", 0, "原灵异州"],
+            ["790759039", "芝士碎碎", 0, "原灵异州"],
+            ["790759603", "酒心可可", 0, "原灵异州"],
+            ["783814472", "诸葛武侯", 0, "原灵异州"],
+            ["787945090", "海·月", 0, "原灵异州"],
+            ["787484575", "菠萝吹雪", 0, "原灵异州"],
+            ["787682074", "浔、柒月", 0, "原灵异州"],
+            ["787810769", "阎令", 0, "原灵异州"],
+            ["787874926", "莫竹", 0, "原灵异州"],
+            ["790169254", "婉婉崽", 0, "原灵异州"],
+            ["787682854", "浔、妤困", 0, "原灵异州"],
+            ["787678962", "浔、麦大麦", 0, "原灵异州"],
+            ["783877551", "月、麦大麦", 0, "原灵异州"],
+            ["787679503", "浔、花俊俊", 0, "原灵异州"],
+            ["790235788", "九月", 0, "原灵异州"],
+            ["787551710", "迷", 0, "原灵异州"],
+            ["787548430", "天桥说书人", 0, "原灵异州"],
+            ["790304540", "古天", 0, "原灵异州"],
+            ["787681994", "浔、玄烛", 0, "原灵异州"],
+            ["790168672", "景泰蓝", 0, "原灵异州"],
+            ["783680926", "月、尤宣", 0, "原灵异州"],
+            ["783878932", "南风吹梦", 0, "原灵异州"],
+            ["790168767", "今月月儿圆", 0, "原灵异州"],
+            ["783880916", "诸葛草包", 0, "原灵异州"],
+            ["790238034", "懒幼", 0, "原灵异州"],
+            ["787482170", "风起兮", 0, "原灵异州"],
+            ["783746594", "洛洛。", 0, "原灵异州"],
+            ["787943963", "皮皮虾宠我", 0, "原灵异州"],
+            ["790564124", "海棠朵朵", 0, "原灵异州"],
+            ["790761324", "虹销雨霁明", 0, "原灵异州"],
+            ["787549441", "诸葛小白", 0, "原灵异州"],
+            ["790564097", "兔耳朵弯弯", 0, "原灵异州"],
+            ["786436714", "大米", 0, "原灵异州"],
+            ["792331251", "十一、一几", 0, "原灵异州"],
+            ["783879842", "秋雨滴入墨", 0, "原灵异州"],
+            ["783553287", "次人♂勤天", 0, "原灵异州"],
+            ["790758989", "靓崽", 0, "原灵异州"],
+            ["786762934", "花解语", 0, "原灵异州"],
+            ["787941530", "欧润橘铁库", 0, "原灵异州"],
+            ["790434170", "静静是谁", 0, "原灵异州"],
+            ["790171264", "达咩小羊", 0, "原灵异州"],
+            ["784798051", "晓光", 0, "原灵异州"],
+            ["785781790", "谈贤", 0, "原灵异州"],
+            ["787679787", "一座小山城", 0, "原灵异州"],
+            ["790630967", "南柯一梦", 0, "原灵异州"],
+            ["787943646", "椒盐皮皮虾", 0, "原灵异州"],
+            ["786631180", "没了兴趣", 0, "原灵异州"],
+            ["791938456", "清梦压星河", 0, "原灵异州"],
+            ["783026773", "清风（慕小秋）", 0, "原灵异州"],
+            ["783815283", "莫非然", 0, "原灵异州"],
+            ["783684324", "无兔", 0, "原灵异州"],
+            ["783680785", "泠泠七弦上", 0, "原灵异州"],
+            ["787416652", "等风", 0, "原灵异州"],
+            ["783684289", "无名氏", 0, "原灵异州"],
+            ["787285618", "马可菠萝包", 0, "原灵异州"],
+            ["787088977", "君子温如玉", 0, "原灵异州"],
+            ["787288436", "西凉回忆", 0, "原灵异州"],
+            ["787288932", "莱西奥利奥", 0, "原灵异州"],
+            ["787288278", "蔡文鸡腿堡", 0, "原灵异州"],
+            ["790173772", "白白崽", 0, "原灵异州"],
+            ["787220008", "六子", 0, "原灵异州"],
+            ["783748478", "九五二七", 0, "原灵异州"],
+            ["783553004", "法兰西", 0, "原灵异州"],
+            ["787289695", "芙栗糖黄、", 0, "原灵异州"],
+            ["787549702", "墩墩", 0, "原灵异州"],
+            ["783684311", "落雪、", 0, "原灵异州"],
+            ["787809262", "郁忆霜", 0, "原灵异州"],
+            ["783747640", "边军小兵", 0, "原灵异州"],
+            ["790173999", "小泡芙", 0, "原灵异州"],
+            ["787419413", "晨昏", 0, "原灵异州"],
+            ["787287909", "甜糕云蛋、", 0, "原灵异州"],
+            ["783680828", "洛雪、", 0, "原灵异州"],
+            ["788072943", "一只", 0, "原灵异州"],
+            ["787219774", "小兔子呀", 0, "原灵异州"],
+            ["790169538", "瑜妮", 0, "原灵异州"],
+            ["791089520", "没心思", 0, "原灵异州"],
+            ["789775370", "解冻融化", 0, "原灵异州"],
+            ["783092179", "泥油猫饼", 0, "原扶摇州"],
+            ["783158500", "叮叮猫", 0, "原扶摇州"],
+            ["783159771", "风再起时", 0, "原扶摇州"],
+            ["783159002", "樱丸小桃子", 0, "原扶摇州"],
+            ["783287651", "九品捕头", 0, "原扶摇州"],
+            ["783030074", "缘来", 0, "原扶摇州"],
+            ["783092955", "榴莲曲奇", 0, "原扶摇州"],
+            ["783028616", "雪梨", 0, "原扶摇州"],
+            ["783878932", "壹壹", 0, "原扶摇州"],
+            ["783095467", "诸宇", 0, "原扶摇州"],
+            ["783159734", "柠檬松饼", 0, "原扶摇州"],
+            ["783225255", "芊芊", 0, "原扶摇州"],
+            ["787549234", "芋泥猫堡", 0, "原扶摇州"],
+            ["787945090", "海·月", 0, "原扶摇州"],
+            ["783684311", "春花", 0, "原扶摇州"],
+            ["786436714", "大米", 0, "原扶摇州"],
+            ["787551710", "事与愿违", 0, "原扶摇州"],
+            ["790169538", "瑜妮", 0, "原扶摇州"],
+            ["786371203", "容天泽", 0, "原扶摇州"],
+            ["783223362", "飞翔", 0, "原扶摇州"],
+            ["783680828", "秋月", 0, "原扶摇州"],
+            ["786437399", "无法无天", 0, "原扶摇州"],
+            ["784336999", "柴祥", 0, "原扶摇州"],
+            ["783159223", "平悦", 0, "原扶摇州"],
+            ["788072943", "一只", 0, "原扶摇州"],
+            ["783354614", "糟糕", 0, "原扶摇州"],
+            ["783028543", "项诚", 0, "原扶摇州"],
+            ["786238545", "打我挂一本", 0, "原扶摇州"],
+            ["783288231", "厉诞", 0, "原扶摇州"],
+            ["785126101", "任凭风乱世", 0, "原扶摇州"],
+            ["789320671", "帅哥", 0, "原扶摇州"],
+            ["786437017", "小白", 0, "原扶摇州"],
+            ["793380260", "萝卜头", 0, "原扶摇州"],
+            ["784536356", "许亦鑫", 0, "原扶摇州"],
+            ["784667964", "蒋新柔", 0, "原扶摇州"],
+            ["783029789", "天零", 0, "原扶摇州"],
+            ["786108226", "季洛轩", 0, "原扶摇州"],
+            ["793121232", "打酱油", 0, "原扶摇州"],
+            ["788794452", "祝蕾", 0, "原扶摇州"],
+            ["738002813", "烨", 0, "原扶摇州"],
+            ["786237542", "经楷瑞", 0, "原扶摇州"],
+            ["784601899", "解凰", 0, "原扶摇州"],
+            ["783550368", "洪书雪", 0, "原扶摇州"],
+            ["785911195", "达达哥", 0, "原扶摇州"],
+            ["783092585", "纸微黎", 0, "原扶摇州"],
+            ["783554170", "乐陶陶", 0, "原扶摇州"],
+            ["793383562", "江城", 0, "原扶摇州"],
+            ["786434343", "乐间辉", 0, "原扶摇州"],
+            ["784796814", "货柜车仔", 0, "原扶摇州"],
+            ["784533111", "乌天", 0, "原扶摇州"],
+            ["783421099", "黎又", 0, "原扶摇州"],
+            ["786566891", "林伍", 0, "原扶摇州"],
+            ["783354000", "周星星", 0, "原扶摇州"],
+            ["791677650", "钟智渊", 0, "原扶摇州"],
+            ["783290036", "盛浩", 0, "原扶摇州"],
+            ["792270964", "樊佳", 0, "原扶摇州"],
+            ["785061077", "熊翎", 0, "原扶摇州"],
+            ["790827123", "敏儿", 0, "原扶摇州"],
+            ["790171663", "踏雪无痕", 0, "原扶摇州"],
+            ["783879842", "凌风秋雨", 0, "原扶摇州"],
+            ["793380089", "舒觅珍", 0, "原扶摇州"],
+            ["783025954", "朱重八", 0, "原扶摇州"],
+            ["783221796", "游魂", 0, "原扶摇州"],
+            ["783225358", "凌云", 0, "原扶摇州"],
+            ["792725454", "小气鬼", 0, "原扶摇州"],
+            ["783027598", "嘻唰唰", 0, "原扶摇州"],
+            ["788071471", "扶雾漫漫", 0, "原龙御州"],
+            ["786236937", "三藏法师", 0, "原龙御州"],
+            ["783815283", "莫非然", 0, "原龙御州"],
+            ["783027287", "架势大人", 0, "原龙御州"],
+            ["783026773", "慕小秋", 0, "原龙御州"],
+            ["783484194", "景天", 0, "原龙御州"],
+            ["786042129", "大顾晋", 0, "原龙御州"],
+            ["783419062", "怀姜", 0, "原龙御州"],
+            ["787288278", "卜可梨鱼", 0, "原龙御州"],
+            ["783418876", "天虞", 0, "原龙御州"],
+            ["786433612", "玉衡神君", 0, "原龙御州"],
+            ["787285618", "胡椒蛮馋", 0, "原龙御州"],
+            ["787088977", "君子温如玉", 0, "原龙御州"],
+            ["787288932", "杨梅兔汽", 0, "原龙御州"],
+            ["786044334", "子衿", 0, "原龙御州"],
+            ["783156943", "影子", 0, "原龙御州"],
+            ["786240779", "九天真君", 0, "原龙御州"],
+            ["787288436", "槟榔十烟", 0, "原龙御州"],
+            ["786041792", "樂樂", 0, "原龙御州"],
+            ["786238138", "熊猫大圣", 0, "原龙御州"],
+            ["783878138", "雾盐", 0, "原龙御州"],
+            ["787287909", "甜糕云蛋", 0, "原龙御州"],
+            ["783682032", "罗天", 0, "原龙御州"],
+            ["786696963", "冬日暖阳", 0, "原龙御州"],
+            ["783617822", "龙葵", 0, "原龙御州"],
+            ["787285554", "星空深渊号", 0, "原龙御州"],
+            ["786896574", "半夏", 0, "原龙御州"],
+            ["786893994", "山善优雅", 0, "原龙御州"],
+            ["787220008", "六子", 0, "原龙御州"],
+            ["786696833", "白鹭", 0, "原龙御州"],
+            ["783749989", "淡定哥", 0, "原龙御州"],
+            ["786434753", "天权神君", 0, "原龙御州"],
+            ["786304117", "广寒仙子", 0, "原龙御州"],
+            ["786238781", "缥缈郎君", 0, "原龙御州"],
+            ["783748417", "古未", 0, "原龙御州"],
+            ["783618186", "北田共", 0, "原龙御州"],
+            ["786435483", "银角大王", 0, "原龙御州"],
+            ["787289695", "芙栗糖黄", 0, "原龙御州"],
+            ["786630450", "孤勇者", 0, "原龙御州"],
+            ["786434694", "雷公", 0, "原龙御州"],
+            ["783747640", "月、种田", 0, "原龙御州"],
+            ["783947510", "风雾漫漫", 0, "原龙御州"],
+            ["783814015", "月、万乾", 0, "原龙御州"],
+            ["786238647", "百花", 0, "原龙御州"],
+            ["783748478", "猪肝粥", 0, "原龙御州"],
+            ["786237551", "北武财神", 0, "原龙御州"],
+            ["783615893", "阿俊", 0, "原龙御州"],
+            ["790041299", "墨殇", 0, "原龙御州"],
+            ["783749302", "狐狸鱼仓库", 0, "原龙御州"],
+            ["787416655", "等风", 0, "原龙御州"],
+            ["783616924", "健忘的小鱼", 0, "原龙御州"],
+            ["787484924", "那年惊蛰", 0, "原龙御州"],
+            ["790630967", "缘起", 0, "原龙御州"],
+            ["787352487", "西楼", 0, "原龙御州"],
+            ["783946810", "阿利斯塔", 0, "原龙御州"],
+            ["783749939", "爱情大白菜", 0, "原龙御州"],
+            ["783814472", "诸葛武侯", 0, "原龙御州"],
+            ["783881951", "周飞尘", 0, "原龙御州"],
+            ["785909198", "唐夫人b粉", 0, "原龙御州"],
+            ["779683635", "与自己和解", 0, "原龙御州"],
+            ["791546990", "罡子", 0, "原龙御州"],
+            ["786828910", "摆烂的叶子", 0, "原风花雪月州"],
+            ["785258078", "一口一汤圆", 0, "原风花雪月州"],
+            ["786765729", "沉稳小葵花", 0, "原风花雪月州"],
+            ["788076472", "格勒吉衣", 0, "原风花雪月州"],
+            ["789845701", "逆鳞、", 0, "原风花雪月州"],
+            ["792727323", "城北", 0, "原风花雪月州"],
+            ["789841515", "菜菜", 0, "原风花雪月州"],
+            ["786695357", "划水的冷月", 0, "原风花雪月州"],
+            ["786698670", "咸鱼的悠然", 0, "原风花雪月州"],
+            ["792793924", "风雪一程", 0, "原风花雪月州"],
+            ["792857783", "胖悠然", 0, "原风花雪月州"],
+            ["789779881", "肖战的腹肌", 0, "原风花雪月州"],
+            ["788989188", "温油的婳婳", 0, "原风花雪月州"],
+            ["786695499", "暴躁小葵花", 0, "原风花雪月州"],
+            ["785190413", "摸鱼的琪琪", 0, "原风花雪月州"],
+            ["790434062", "秦", 0, "原风花雪月州"],
+            ["786696939", "霓凰", 0, "原风花雪月州"],
+            ["790630967", "南柯一梦", 0, "原风花雪月州"],
+            ["786696293", "红尘客", 0, "原风花雪月州"],
+            ["787941200", "抽卡小王子", 0, "原风花雪月州"],
+            ["787023993", "惆怅的南歌", 0, "原风花雪月州"],
+            ["789842814", "不嘻嘻", 0, "原风花雪月州"],
+            ["787289770", "夏夏", 0, "原风花雪月州"],
+            ["785189067", "云逸风", 0, "原风花雪月州"],
+            ["788009454", "怠工的天泽", 0, "原风花雪月州"],
+            ["786695487", "君·铁柱", 0, "原风花雪月州"],
+            ["787612882", "南山", 0, "原风花雪月州"],
+            ["789187166", "可爱的成成", 0, "原风花雪月州"],
+            ["788007818", "敷衍的祭司", 0, "原风花雪月州"],
+            ["784600694", "天官赐福", 0, "原风花雪月州"],
+            ["788006100", "夏夏的小妃", 0, "原风花雪月州"],
+            ["788009124", "太湖仙翁", 0, "原风花雪月州"],
+            ["788139636", "汤圆", 0, "原风花雪月州"],
+            ["789120540", "暴躁的依依", 0, "原风花雪月州"],
+            ["788335249", "退堂的鼓", 0, "原风花雪月州"],
+            ["788334208", "夹薪饼干", 0, "原风花雪月州"],
+            ["790564453", "猫耳酱", 0, "原风花雪月州"],
+            ["787940401", "快来保护我", 0, "原风花雪月州"],
+            ["788599151", "南晴小土豆", 0, "原风花雪月州"],
+            ["786826722", "摘星", 0, "原风花雪月州"],
+            ["787940503", "梵觉", 0, "原风花雪月州"],
+            ["789842461", "东亭", 0, "原风花雪月州"],
+            ["793317468", "农侬哝浓人", 0, "原风花雪月州"],
+            ["786695324", "墨色玄离", 0, "原风花雪月州"],
+            ["787025261", "旭日曙光", 0, "原风花雪月州"],
+            ["787944407", "小红", 0, "原风花雪月州"],
+            ["789122884", "高冷的安安", 0, "原风花雪月州"],
+            ["787943921", "茶茶小公主", 0, "原风花雪月州"],
+            ["790694780", "四十七", 0, "原风花雪月州"],
+            ["785189259", "D长安", 0, "原风花雪月州"],
+            ["786697015", "致爱妃夏夏", 0, "原风花雪月州"],
+            ["788009928", "零度的可乐", 0, "原风花雪月州"],
+            ["786762503", "无意", 0, "原风花雪月州"],
+            ["785188048", "及时行乐", 0, "原风花雪月州"],
+            ["787024036", "松萝", 0, "原风花雪月州"],
+            ["788138156", "折纸为鹤", 0, "原风花雪月州"],
+            ["786961399", "黛丝", 0, "原风花雪月州"],
+            ["787287869", "墨意", 0, "原风花雪月州"],
+            ["791547296", "彼岸花", 0, "原风花雪月州"],
+            ["786762996", "牙牙", 0, "原风花雪月州"],
+            ["785122331", "薛定谔的猫", 0, "原风花雪月州"],
+            ["792135696", "策划吗死了", 0, "原风花雪月州"],
+            ["785189378", "小佳", 0, "原风花雪月州"],
+            ["788140757", "易凰", 0, "原风花雪月州"],
+            ["786764992", "访问小葵花", 0, "原风花雪月州"],
+            ["790302422", "爱财爱己", 0, "原风花雪月州"],
+            ["790038218", "小痴天下", 0, "原风花雪月州"],
+            ["792923308", "芍药", 0, "原风花雪月州"],
+            ["787940583", "陆仁贾", 0, "原风花雪月州"],
+            ["788335791", "古紫槐", 0, "原风花雪月州"],
+            ["786695973", "君、宴昭", 0, "原风花雪月州"],
+            ["788009959", "浊酒", 0, "原风花雪月州"],
+            ["789842806", "厉飞羽", 0, "原风花雪月州"],
+            ["789321605", "恶霸的铁库", 0, "原风花雪月州"],
+            ["791808475", "阿舟舟", 0, "原风花雪月州"],
+            ["788005946", "32级山贼", 0, "原风花雪月州"],
+            ["792726613", "城北铁号", 0, "原风花雪月州"],
+            ["786698724", "小花", 0, "原风花雪月州"],
+            ["787942855", "摆烂的夏夏", 0, "原风花雪月州"],
+            ["785322133", "雨", 0, "原风花雪月州"],
+            ["786697275", "长日锟语", 0, "原风花雪月州"],
+            ["788140574", "汤圆秘书", 0, "原风花雪月州"],
+            ["786829345", "退一周", 0, "原风花雪月州"],
+            ["788268896", "大逆伐谋", 0, "原风花雪月州"],
+            ["788009959", "浊酒", 0, "原庆州"],
+            ["788269371", "靓女", 0, "原庆州"],
+            ["788268909", "陆梨", 0, "原庆州"],
+            ["793907745", "柳映晚", 0, "原庆州"],
+            ["792921193", "玄都小法师", 0, "原庆州"],
+            ["793055206", "兮若", 0, "原庆州"],
+            ["789517099", "哪吒", 0, "原庆州"],
+            ["784994837", "赏蜜", 0, "原庆州"],
+            ["789254191", "泥腿子", 0, "原庆州"],
+            ["792725888", "愉悦", 0, "原庆州"],
+            ["785061092", "蓬逸", 0, "原庆州"],
+            ["788005969", "零星一点点", 0, "原庆州"],
+            ["790435423", "十五", 0, "原庆州"],
+            ["793907075", "戏风烟", 0, "原庆州"],
+            ["789843885", "官渡把着帅", 0, "原庆州"],
+            ["786695444", "超售", 0, "原庆州"],
+            ["788006879", "柚柚", 0, "原庆州"],
+            ["788010307", "金密", 0, "原庆州"],
+            ["788072481", "田秋双", 0, "原庆州"],
+            ["790695592", "龙容", 0, "原庆州"],
+            ["786765752", "破局", 0, "原庆州"],
+            ["789058320", "有点小烦恼", 0, "原庆州"],
+            ["790304149", "随风", 0, "原庆州"],
+            ["787941688", "呼啸", 0, "原庆州"],
+            ["790041919", "叶枬炊", 0, "原庆州"],
+            ["789190175", "槿·卡瓦俞", 0, "原庆州"],
+            ["788010738", "紫川", 0, "原庆州"],
+            ["788335100", "划水的鱼", 0, "原庆州"],
+            ["791809290", "Jaly", 0, "原庆州"],
+            ["789255568", "莫怜寒", 0, "原庆州"],
+            ["793711093", "九品芝麻官", 0, "原庆州"],
+            ["783551424", "浪酒神", 0, "原庆州"],
+            ["789187806", "槿·疏星桐", 0, "原庆州"],
+            ["790300758", "落叶", 0, "原庆州"],
+            ["788334804", "小羊鼓的铁", 0, "原庆州"],
+            ["788268872", "旧知己", 0, "原庆州"],
+            ["787942092", "艾庭", 0, "原庆州"],
+            ["789251461", "炎焱", 0, "原庆州"],
+            ["785318893", "老和尚", 0, "原庆州"],
+            ["788335783", "偷来的钱", 0, "原庆州"],
+            ["790042438", "支衍", 0, "原庆州"],
+            ["788337959", "装饭的桶", 0, "原庆州"],
+            ["787943009", "玄都大祭司", 0, "原庆州"],
+            ["792790875", "安安", 0, "原春和景明州"],
+            ["792791211", "苏苏呀", 0, "原春和景明州"],
+            ["792728114", "不劳而获", 0, "原春和景明州"],
+            ["792855554", "港城锋哥", 0, "原春和景明州"],
+            ["792728546", "君上铁库", 0, "原春和景明州"],
+            ["792528239", "是秋秋哇", 0, "原春和景明州"],
+            ["792727037", "小元子", 0, "原春和景明州"],
+            ["792729125", "北梦木兮", 0, "原春和景明州"],
+            ["792728942", "云下青", 0, "原春和景明州"],
+            ["792791754", "细辛", 0, "原春和景明州"],
+            ["792728475", "贺悦", 0, "原春和景明州"],
+            ["792596793", "老六", 0, "原春和景明州"],
+            ["791549634", "Sunny", 0, "原春和景明州"],
+            ["783881618", "司马侧滑", 0, "原春和景明州"],
+            ["790826227", "迪迦", 0, "原春和景明州"],
+            ["792726775", "太和", 0, "原春和景明州"],
+            ["792725010", "舒禾", 0, "原春和景明州"],
+            ["792725115", "籍师", 0, "原春和景明州"],
+            ["792728355", "夜月", 0, "原春和景明州"],
+            ["755634443", "林峰", 0, "原春和景明州"],
+            ["792728690", "梦梦", 0, "原春和景明州"],
+            ["753077008", "君常笑", 0, "原春和景明州"],
+            ["792922624", "横竖撇捺", 0, "原春和景明州"],
+            ["791614298", "须尽欢", 0, "原春和景明州"],
+            ["791611028", "馒头炖花卷", 0, "原春和景明州"]
         ];
-        
-        // 当前管理员选择的文件
-        let adminSelectedFile = null;
-        // 待删除的游戏记录
-        let recordToDelete = null;
-        
-        // DOM元素
-        const searchInput = document.getElementById('searchInput');
-        const searchButton = document.getElementById('searchButton');
-        const clearSearch = document.getElementById('clearSearch');
-        const noDataMessage = document.getElementById('noDataMessage');
-        const noResultsMessage = document.getElementById('noResultsMessage');
-        const resultsContainer = document.getElementById('resultsContainer');
-        const resultsList = document.getElementById('resultsList');
-        const resultsCount = document.getElementById('resultsCount');
-        const notification = document.getElementById('notification');
-        const notificationIcon = document.getElementById('notificationIcon');
-        const notificationMessage = document.getElementById('notificationMessage');
-        
-        // 管理员相关元素
-        const adminButton = document.getElementById('adminButton');
-        const adminPasswordModal = document.getElementById('adminPasswordModal');
-        const adminPasswordInput = document.getElementById('adminPasswordInput');
-        const adminPasswordError = document.getElementById('adminPasswordError');
-        const confirmAdminPassword = document.getElementById('confirmAdminPassword');
-        const cancelAdminPassword = document.getElementById('cancelAdminPassword');
-        const adminPanel = document.getElementById('adminPanel');
-        const closeAdminPanel = document.getElementById('closeAdminPanel');
-        
-        // 手动添加数据表单元素
-        const manualGameId = document.getElementById('manualGameId');
-        const manualGameName = document.getElementById('manualGameName');
-        const manualPower = document.getElementById('manualPower');
-        const manualState = document.getElementById('manualState');
-        const addManualData = document.getElementById('addManualData');
-        const resetManualForm = document.getElementById('resetManualForm');
-        
-        // 管理员搜索删除元素
-        const adminSearchInput = document.getElementById('adminSearchInput');
-        const adminSearchButton = document.getElementById('adminSearchButton');
-        const adminNoResultsMessage = document.getElementById('adminNoResultsMessage');
-        const adminResultsContainer = document.getElementById('adminResultsContainer');
-        const adminResultsList = document.getElementById('adminResultsList');
-        const adminResultsCount = document.getElementById('adminResultsCount');
-        
-        // 删除确认元素
-        const deleteConfirmModal = document.getElementById('deleteConfirmModal');
-        const deleteConfirmMessage = document.getElementById('deleteConfirmMessage');
-        const confirmDelete = document.getElementById('confirmDelete');
-        const cancelDelete = document.getElementById('cancelDelete');
-        
-        // 导入错误提示元素
-        const importErrorModal = document.getElementById('importErrorModal');
-        const importErrorMessage = document.getElementById('importErrorMessage');
-        const closeImportError = document.getElementById('closeImportError');
-        
-        // Excel导入元素
-        const adminDropArea = document.getElementById('adminDropArea');
-        const adminFileInput = document.getElementById('adminFileInput');
-        const adminFileInfo = document.getElementById('adminFileInfo');
-        const adminFileName = document.getElementById('adminFileName');
-        const adminRemoveFile = document.getElementById('adminRemoveFile');
-        const confirmImport = document.getElementById('confirmImport');
-        const importProgress = document.getElementById('importProgress');
-        
-        // 数据持久化 - 保存到本地存储
-        function saveDataToStorage() {
-            localStorage.setItem('qilanzhouGameData', JSON.stringify(gameData));
-        }
-        
-        // 数据持久化 - 从本地存储加载
-        function loadDataFromStorage() {
-            try {
-                const data = localStorage.getItem('qilanzhouGameData');
-                return data ? JSON.parse(data) : null;
-            } catch (error) {
-                console.error('加载本地数据失败:', error);
-                showNotification('加载数据失败，使用初始数据', false);
-                return null;
-            }
-        }
-        
-        // 显示通知
-        function showNotification(message, isSuccess = true) {
-            notificationMessage.textContent = message;
-            notificationIcon.className = isSuccess ? 'fa fa-check-circle text-green-500 mr-2' : 'fa fa-exclamation-circle text-red-500 mr-2';
-            notification.className = `fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg translate-y-0 opacity-100 transition-all duration-300 flex items-center max-w-xs w-full ${isSuccess ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`;
+
+        // 搜索功能
+        function search() {
+            const searchTerm = document.getElementById('searchTerm').value.trim();
+            const resultDiv = document.getElementById('result');
+            const initialMessage = document.getElementById('initialMessage');
             
-            setTimeout(() => {
-                notification.className = 'fixed bottom-4 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg translate-y-20 opacity-0 transition-all duration-300 flex items-center max-w-xs w-full';
-            }, 3000);
-        }
-        
-        // 显示管理员密码弹窗
-        function showAdminPasswordModal() {
-            adminPasswordModal.classList.remove('hidden');
-            setTimeout(() => {
-                adminPasswordModal.classList.remove('opacity-0');
-                adminPasswordModal.querySelector('div').classList.remove('scale-95');
-                adminPasswordModal.querySelector('div').classList.add('scale-100');
-            }, 10);
-            adminPasswordInput.focus();
-            adminPasswordInput.value = '';
-            adminPasswordError.classList.add('hidden');
-        }
-        
-        // 隐藏管理员密码弹窗
-        function hideAdminPasswordModal() {
-            adminPasswordModal.classList.add('opacity-0');
-            adminPasswordModal.querySelector('div').classList.remove('scale-100');
-            adminPasswordModal.querySelector('div').classList.add('scale-95');
-            setTimeout(() => {
-                adminPasswordModal.classList.add('hidden');
-            }, 300);
-        }
-        
-        // 显示管理员面板
-        function showAdminPanel() {
-            hideAdminPasswordModal();
-            adminPanel.classList.remove('hidden');
-            setTimeout(() => {
-                adminPanel.classList.remove('opacity-0');
-                adminPanel.querySelector('div').classList.remove('scale-95');
-                adminPanel.querySelector('div').classList.add('scale-100');
-            }, 10);
-            resetManualForm.click(); // 重置手动添加表单
-            adminSearchInput.value = ''; // 清空管理员搜索框
-            adminNoResultsMessage.classList.add('hidden');
-            adminResultsContainer.classList.add('hidden');
-            adminSelectedFile = null;
-            adminFileInfo.classList.add('hidden');
-            confirmImport.disabled = true;
-            importProgress.classList.add('hidden');
-        }
-        
-        // 隐藏管理员面板
-        function hideAdminPanel() {
-            adminPanel.classList.add('opacity-0');
-            adminPanel.querySelector('div').classList.remove('scale-100');
-            adminPanel.querySelector('div').classList.add('scale-95');
-            setTimeout(() => {
-                adminPanel.classList.add('hidden');
-                adminFileInput.value = '';
-            }, 300);
-        }
-        
-        // 显示删除确认弹窗
-        function showDeleteConfirmModal(record) {
-            recordToDelete = record;
-            deleteConfirmMessage.textContent = `您确定要删除"${record['游戏名字']}"（编号：${record['游戏编号']}）吗？此操作不可撤销。`;
-            deleteConfirmModal.classList.remove('hidden');
-            setTimeout(() => {
-                deleteConfirmModal.classList.remove('opacity-0');
-                deleteConfirmModal.querySelector('div').classList.remove('scale-95');
-                deleteConfirmModal.querySelector('div').classList.add('scale-100');
-            }, 10);
-        }
-        
-        // 隐藏删除确认弹窗
-        function hideDeleteConfirmModal() {
-            deleteConfirmModal.classList.add('opacity-0');
-            deleteConfirmModal.querySelector('div').classList.remove('scale-100');
-            deleteConfirmModal.querySelector('div').classList.add('scale-95');
-            setTimeout(() => {
-                deleteConfirmModal.classList.add('hidden');
-                recordToDelete = null;
-            }, 300);
-        }
-        
-        // 显示导入错误弹窗
-        function showImportError(message) {
-            importErrorMessage.innerHTML = message;
-            importErrorModal.classList.remove('hidden');
-            setTimeout(() => {
-                importErrorModal.classList.remove('opacity-0');
-                importErrorModal.querySelector('div').classList.remove('scale-95');
-                importErrorModal.querySelector('div').classList.add('scale-100');
-            }, 10);
-        }
-        
-        // 隐藏导入错误弹窗
-        function hideImportError() {
-            importErrorModal.classList.add('opacity-0');
-            importErrorModal.querySelector('div').classList.remove('scale-100');
-            importErrorModal.querySelector('div').classList.add('scale-95');
-            setTimeout(() => {
-                importErrorModal.classList.add('hidden');
-            }, 300);
-        }
-        
-        // 验证管理员密码
-        function verifyAdminPassword(password) {
-            const correctPassword = '1794';
-            return password === correctPassword;
-        }
-        
-        // 验证手动输入的数据
-        function validateManualData() {
-            const gameId = manualGameId.value.trim();
-            const gameName = manualGameName.value.trim();
-            const power = manualPower.value.trim();
-            const state = manualState.value.trim();
-            
-            // 检查必填字段
-            if (!gameId) {
-                showNotification('请输入游戏编号', false);
-                manualGameId.focus();
-                return false;
-            }
-            
-            if (!gameName) {
-                showNotification('请输入游戏名字', false);
-                manualGameName.focus();
-                return false;
-            }
-            
-            if (!power) {
-                showNotification('请输入战力值', false);
-                manualPower.focus();
-                return false;
-            }
-            
-            // 检查战力是否为数字
-            if (isNaN(power) || parseInt(power) < 0) {
-                showNotification('战力值必须是有效的数字', false);
-                manualPower.focus();
-                return false;
-            }
-            
-            if (!state) {
-                showNotification('请输入所在州', false);
-                manualState.focus();
-                return false;
-            }
-            
-            return true;
-        }
-        
-        // 手动添加数据
-        function addManualRecord() {
-            if (!validateManualData()) {
-                return;
-            }
-            
-            // 创建新记录
-            const newRecord = {
-                "游戏编号": manualGameId.value.trim(),
-                "游戏名字": manualGameName.value.trim(),
-                "战力": parseInt(manualPower.value.trim()),
-                "所在州": manualState.value.trim()
-            };
-            
-            // 添加到数据中
-            gameData.push(newRecord);
-            
-            // 保存到本地存储
-            saveDataToStorage();
-            
-            // 重置表单
-            resetManualForm.click();
-            
-            // 显示成功通知
-            showNotification('数据添加成功');
-        }
-        
-        // 重置手动添加表单
-        function resetManualFormFields() {
-            manualGameId.value = '';
-            manualGameName.value = '';
-            manualPower.value = '';
-            manualState.value = '';
-            manualGameId.focus();
-        }
-        
-        // 执行删除操作
-        function executeDelete() {
-            if (!recordToDelete) return;
-            
-            // 过滤掉要删除的记录
-            const initialLength = gameData.length;
-            gameData = gameData.filter(game => 
-                !(game['游戏编号'] === recordToDelete['游戏编号'] && 
-                  game['游戏名字'] === recordToDelete['游戏名字'])
-            );
-            
-            // 保存到本地存储
-            saveDataToStorage();
-            
-            // 隐藏确认弹窗
-            hideDeleteConfirmModal();
-            
-            // 重新执行管理员搜索，更新结果列表
-            if (adminSearchInput.value.trim()) {
-                adminSearchGames();
-            }
-            
-            // 重置前台搜索结果
-            resetSearchResults();
-            
-            // 显示成功通知
-            showNotification(`成功删除记录: ${recordToDelete['游戏名字']}`);
-        }
-        
-        // 处理管理员选择的文件
-        function handleAdminFileSelection(file) {
-            // 检查文件类型
-            if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-                showNotification('请选择Excel文件 (.xlsx, .xls)', false);
-                return;
-            }
-            
-            // 检查文件大小（限制10MB）
-            if (file.size > 10 * 1024 * 1024) {
-                showNotification('文件过大，请选择10MB以下的Excel文件', false);
-                return;
-            }
-            
-            adminSelectedFile = file;
-            adminFileName.textContent = file.name;
-            adminFileInfo.classList.remove('hidden');
-            confirmImport.disabled = false;
-        }
-        
-        // 移除管理员选择的文件
-        function removeAdminFile() {
-            adminSelectedFile = null;
-            adminFileInput.value = '';
-            adminFileInfo.classList.add('hidden');
-            confirmImport.disabled = true;
-        }
-        
-        // 导入Excel文件更新数据
-        function importExcelData() {
-            if (!adminSelectedFile) return;
-            
-            // 显示加载状态
-            confirmImport.disabled = true;
-            importProgress.classList.remove('hidden');
-            
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
-                try {
-                    // 解析Excel文件
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    
-                    // 获取第一个工作表
-                    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-                        throw new Error('Excel文件中没有工作表，请检查文件内容');
-                    }
-                    
-                    const firstSheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[firstSheetName];
-                    
-                    // 转换为JSON
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                    
-                    // 验证数据格式
-                    if (jsonData.length === 0) {
-                        throw new Error('Excel文件中没有数据，请检查文件内容');
-                    }
-                    
-                    // 检查是否包含必要的列
-                    const requiredColumns = ['游戏编号', '游戏名字', '战力', '所在州'];
-                    const firstRow = jsonData[0];
-                    const missingColumns = requiredColumns.filter(col => !Object.keys(firstRow).includes(col));
-                    
-                    if (missingColumns.length > 0) {
-                        throw new Error(`文件缺少必要的列: ${missingColumns.join(', ')}<br>请确保第一行为：游戏编号，游戏名字，战力，所在州`);
-                    }
-                    
-                    // 验证每一行的数据格式
-                    const invalidRows = [];
-                    jsonData.forEach((row, index) => {
-                        const rowNumber = index + 2; // 行号从2开始（第一行是标题）
-                        
-                        // 检查游戏编号
-                        if (!row['游戏编号'] || String(row['游戏编号']).trim() === '') {
-                            invalidRows.push(`第 ${rowNumber} 行：游戏编号不能为空`);
-                        }
-                        
-                        // 检查游戏名字
-                        if (!row['游戏名字'] || String(row['游戏名字']).trim() === '') {
-                            invalidRows.push(`第 ${rowNumber} 行：游戏名字不能为空`);
-                        }
-                        
-                        // 检查战力是否为有效数字
-                        if (row['战力'] === undefined || row['战力'] === null || isNaN(row['战力']) || row['战力'] < 0) {
-                            invalidRows.push(`第 ${rowNumber} 行：战力必须是有效的非负数字`);
-                        }
-                        
-                        // 检查所在州
-                        if (!row['所在州'] || String(row['所在州']).trim() === '') {
-                            invalidRows.push(`第 ${rowNumber} 行：所在州不能为空`);
-                        }
-                    });
-                    
-                    // 如果有无效行，显示错误信息
-                    if (invalidRows.length > 0) {
-                        let errorMessage = `发现 ${invalidRows.length} 行数据格式错误：<br><br>`;
-                        invalidRows.forEach(msg => {
-                            errorMessage += `- ${msg}<br>`;
-                        });
-                        throw new Error(errorMessage);
-                    }
-                    
-                    // 处理战力值为数字类型
-                    const processedData = jsonData.map(row => ({
-                        ...row,
-                        "战力": Number(row["战力"])
-                    }));
-                    
-                    // 更新游戏数据
-                    gameData = processedData;
-                    
-                    // 保存到本地存储
-                    saveDataToStorage();
-                    
-                    // 重置搜索结果
-                    resetSearchResults();
-                    
-                    // 重置管理员搜索结果
-                    adminSearchInput.value = '';
-                    adminNoResultsMessage.classList.add('hidden');
-                    adminResultsContainer.classList.add('hidden');
-                    
-                    // 隐藏加载状态
-                    importProgress.classList.add('hidden');
-                    
-                    // 移除选中的文件
-                    removeAdminFile();
-                    
-                    // 提示成功
-                    showNotification(`成功导入 ${gameData.length} 条数据`);
-                    
-                    // 关闭管理员面板
-                    hideAdminPanel();
-                } catch (error) {
-                    console.error('解析Excel文件时出错:', error);
-                    
-                    // 隐藏加载状态
-                    importProgress.classList.add('hidden');
-                    confirmImport.disabled = false;
-                    
-                    // 显示错误信息
-                    showImportError(error.message);
-                }
-            };
-            
-            reader.onerror = function() {
-                // 隐藏加载状态
-                importProgress.classList.add('hidden');
-                confirmImport.disabled = false;
-                
-                showImportError('读取文件时出错，请检查文件是否损坏或重新选择文件');
-            };
-            
-            // 处理大文件时使用分段读取
-            if (adminSelectedFile.size > 1024 * 1024) {
-                reader.readAsArrayBuffer(adminSelectedFile.slice(0, 1024 * 1024 * 5));
-            } else {
-                reader.readAsArrayBuffer(adminSelectedFile);
-            }
-        }
-        
-        // 检查两个字符串是否有至少5位数字匹配
-        function hasFiveMatchingDigits(str1, str2) {
-            // 确保两个字符串都至少有5位
-            if (str1.length < 5 || str2.length < 5) {
-                return false;
-            }
-            
-            // 计算匹配的位数
-            let matchCount = 0;
-            for (let i = 0; i < Math.min(str1.length, str2.length); i++) {
-                if (str1[i] === str2[i]) {
-                    matchCount++;
-                    if (matchCount >= 5) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-        
-        // 搜索游戏（前台）
-        function searchGames() {
-            const searchTerm = searchInput.value.trim();
+            // 清空结果区域
+            resultDiv.innerHTML = '';
             
             if (!searchTerm) {
-                showNotification('请输入信息', false);
-                return;
-            }
-            
-            // 清空之前的结果
-            resultsList.innerHTML = '';
-            
-            // 执行搜索
-            const results = performSearch(searchTerm);
-            
-            // 显示结果
-            displayResults(results);
-        }
-        
-        // 搜索游戏（管理员后台）
-        function adminSearchGames() {
-            const searchTerm = adminSearchInput.value.trim();
-            
-            if (!searchTerm) {
-                showNotification('请输入信息', false);
-                return;
-            }
-            
-            // 清空之前的结果
-            adminResultsList.innerHTML = '';
-            
-            // 执行搜索
-            const results = performSearch(searchTerm);
-            
-            // 显示管理员搜索结果
-            displayAdminResults(results);
-        }
-        
-        // 执行搜索逻辑（共用）
-        function performSearch(searchTerm) {
-            // 检查是否是数字（可能是编号搜索）
-            const isNumberSearch = /^\d+$/.test(searchTerm);
-            let results = [];
-            
-            if (isNumberSearch) {
-                // 编号搜索 - 处理包含冒号的情况
-                results = gameData.filter(game => {
-                    const gameId = String(game['游戏编号']);
-                    const searchId = searchTerm.padStart(5, '0');
-                    
-                    // 检查是否包含冒号
-                    if (gameId.includes(':')) {
-                        // 分割为冒号前后两部分
-                        const [part1, part2] = gameId.split(':', 2);
-                        
-                        // 检查两部分是否有5位数字匹配
-                        const part1Match = part1 && hasFiveMatchingDigits(part1.padStart(5, '0'), searchId);
-                        const part2Match = part2 && hasFiveMatchingDigits(part2.padStart(5, '0'), searchId);
-                        
-                        return part1Match || part2Match;
-                    } else {
-                        // 不包含冒号的情况，直接检查
-                        return hasFiveMatchingDigits(gameId.padStart(5, '0'), searchId);
-                    }
-                });
-            } else {
-                // 名称搜索 - 模糊匹配
-                const searchLower = searchTerm.toLowerCase();
-                results = gameData.filter(game => 
-                    String(game['游戏名字']).toLowerCase().includes(searchLower)
-                );
-            }
-            
-            return results;
-        }
-        
-        // 显示前台搜索结果
-        function displayResults(results) {
-            noDataMessage.classList.add('hidden');
-            noResultsMessage.classList.add('hidden');
-            resultsContainer.classList.add('hidden');
-            
-            if (results.length === 0) {
-                noResultsMessage.classList.remove('hidden');
-                return;
-            }
-            
-            // 显示结果
-            resultsContainer.classList.remove('hidden');
-            resultsCount.textContent = `找到 ${results.length} 条匹配结果`;
-            
-            // 添加结果到列表
-            results.forEach((game, index) => {
-                const resultItem = document.createElement('div');
-                resultItem.className = 'result-item bg-gray-50 p-3 rounded-r-lg hover:bg-gray-100 transition-colors opacity-0 transform translate-y-2';
-                resultItem.style.transition = `opacity 0.3s ease ${index * 0.05}s, transform 0.3s ease ${index * 0.05}s`;
-                
-                // 分行显示每个字段
-                resultItem.innerHTML = `
-                    <div class="mb-1"><span class="text-xs text-gray-500">游戏编号：</span><span class="text-sm">${game['游戏编号'] || '-'}</span></div>
-                    <div class="mb-1"><span class="text-xs text-gray-500">游戏名字：</span><span class="text-sm font-medium">${game['游戏名字'] || '-'}</span></div>
-                    <div class="mb-1"><span class="text-xs text-gray-500">战力：</span><span class="text-sm">${game['战力'] || '-'}</span></div>
-                    <div><span class="text-xs text-gray-500">所在州：</span><span class="text-sm">${game['所在州'] || '-'}</span></div>
-                `;
-                
-                resultsList.appendChild(resultItem);
-                
-                // 触发动画
-                setTimeout(() => {
-                    resultItem.style.opacity = '1';
-                    resultItem.style.transform = 'translateY(0)';
-                }, 50);
-            });
-        }
-        
-        // 显示管理员搜索结果（带删除按钮）
-        function displayAdminResults(results) {
-            adminNoResultsMessage.classList.add('hidden');
-            adminResultsContainer.classList.add('hidden');
-            
-            if (results.length === 0) {
-                adminNoResultsMessage.classList.remove('hidden');
-                return;
-            }
-            
-            // 显示结果
-            adminResultsContainer.classList.remove('hidden');
-            adminResultsCount.textContent = `找到 ${results.length} 条匹配结果，点击条目可删除`;
-            
-            // 添加结果到列表
-            results.forEach((game, index) => {
-                const resultItem = document.createElement('div');
-                resultItem.className = 'admin-result-item bg-gray-50 p-3 rounded-r-lg hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer opacity-0 transform translate-y-2 border border-transparent';
-                resultItem.style.transition = `opacity 0.3s ease ${index * 0.05}s, transform 0.3s ease ${index * 0.05}s`;
-                
-                // 点击事件 - 触发删除确认
-                resultItem.addEventListener('click', () => {
-                    showDeleteConfirmModal(game);
-                });
-                
-                // 分行显示每个字段，添加删除图标
-                resultItem.innerHTML = `
-                    <div class="flex justify-between items-start">
-                        <div class="flex-1 pr-2">
-                            <div class="mb-1"><span class="text-xs text-gray-500">游戏编号：</span><span class="text-sm">${game['游戏编号'] || '-'}</span></div>
-                            <div class="mb-1"><span class="text-xs text-gray-500">游戏名字：</span><span class="text-sm font-medium">${game['游戏名字'] || '-'}</span></div>
-                            <div class="mb-1"><span class="text-xs text-gray-500">战力：</span><span class="text-sm">${game['战力'] || '-'}</span></div>
-                            <div><span class="text-xs text-gray-500">所在州：</span><span class="text-sm">${game['所在州'] || '-'}</span></div>
-                        </div>
-                        <div class="text-danger opacity-70">
-                            <i class="fa fa-trash-o"></i>
-                        </div>
+                resultDiv.innerHTML = `
+                    <div class="text-center text-gray-500 py-10">
+                        <i class="fa fa-exclamation-circle text-4xl mb-3 text-yellow-500"></i>
+                        <p>请输入查询关键词</p>
                     </div>
                 `;
-                
-                adminResultsList.appendChild(resultItem);
-                
-                // 触发动画
-                setTimeout(() => {
-                    resultItem.style.opacity = '1';
-                    resultItem.style.transform = 'translateY(0)';
-                }, 50);
-            });
-        }
-        
-        // 重置搜索结果
-        function resetSearchResults() {
-            searchInput.value = '';
-            resultsList.innerHTML = '';
-            resultsContainer.classList.add('hidden');
-            noResultsMessage.classList.add('hidden');
-            noDataMessage.classList.remove('hidden');
-            searchInput.focus();
-        }
-        
-        // 事件监听器
-        // 管理员相关
-        adminButton.addEventListener('click', showAdminPasswordModal);
-        
-        confirmAdminPassword.addEventListener('click', () => {
-            const password = adminPasswordInput.value.trim();
-            if (verifyAdminPassword(password)) {
-                showAdminPanel();
-            } else {
-                adminPasswordError.classList.remove('hidden');
-                adminPasswordInput.focus();
+                return;
             }
-        });
-        
-        cancelAdminPassword.addEventListener('click', hideAdminPasswordModal);
-        
-        adminPasswordInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                confirmAdminPassword.click();
-            }
-        });
-        
-        closeAdminPanel.addEventListener('click', hideAdminPanel);
-        
-        // 手动添加数据
-        addManualData.addEventListener('click', addManualRecord);
-        resetManualForm.addEventListener('click', resetManualFormFields);
-        
-        // 为手动添加表单添加回车提交功能
-        [manualGameId, manualGameName, manualPower, manualState].forEach(input => {
-            input.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') {
-                    addManualData.click();
-                }
-            });
-        });
-        
-        // 管理员搜索删除功能
-        adminSearchButton.addEventListener('click', adminSearchGames);
-        
-        adminSearchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                adminSearchButton.click();
-            }
-        });
-        
-        // 删除确认
-        confirmDelete.addEventListener('click', executeDelete);
-        cancelDelete.addEventListener('click', hideDeleteConfirmModal);
-        
-        // 导入错误提示
-        closeImportError.addEventListener('click', hideImportError);
-        
-        // 管理员文件上传
-        adminDropArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            adminDropArea.classList.add('file-drop-active');
-        });
-        
-        adminDropArea.addEventListener('dragleave', () => {
-            adminDropArea.classList.remove('file-drop-active');
-        });
-        
-        adminDropArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            adminDropArea.classList.remove('file-drop-active');
             
-            if (e.dataTransfer.files.length) {
-                const file = e.dataTransfer.files[0];
-                handleAdminFileSelection(file);
-            }
-        });
-        
-        adminDropArea.addEventListener('click', () => {
-            adminFileInput.click();
-        });
-        
-        adminFileInput.addEventListener('change', () => {
-            if (adminFileInput.files.length) {
-                const file = adminFileInput.files[0];
-                handleAdminFileSelection(file);
-            }
-        });
-        
-        adminRemoveFile.addEventListener('click', removeAdminFile);
-        
-        confirmImport.addEventListener('click', importExcelData);
-        
-        // 前台搜索相关
-        searchButton.addEventListener('click', searchGames);
-        
-        clearSearch.addEventListener('click', resetSearchResults);
-        
-        searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                searchGames();
-            }
-        });
-        
-        // 页面加载完成后自动聚焦到搜索框
-        window.addEventListener('load', () => {
-            searchInput.focus();
-            // 显示数据加载成功的提示
-            showNotification(`已加载 ${gameData.length} 条数据`);
-        });
-        
-        // 处理窗口大小变化，优化移动端体验
-        window.addEventListener('resize', () => {
-            // 确保弹窗在窗口大小变化时保持居中
-            const modals = [adminPasswordModal, adminPanel, deleteConfirmModal, importErrorModal];
-            modals.forEach(modal => {
-                if (!modal.classList.contains('hidden')) {
-                    modal.style.display = 'none';
-                    setTimeout(() => {
-                        modal.style.display = 'flex';
-                    }, 10);
+            // 提取纯数字（用于游戏编号匹配）
+            const searchNumbers = searchTerm.replace(/\D/g, '');
+            const results = [];
+            
+            // 遍历数据查找匹配项
+            gameData.forEach(item => {
+                const [gameId, gameName, power, state] = item;
+                
+                // 提取游戏编号中的纯数字
+                const gameIdNumbers = gameId.replace(/\D/g, '');
+                
+                // 条件1：游戏编号有5位数字匹配
+                let idMatch = false;
+                if (searchNumbers.length >= 5) {
+                    // 检查搜索数字是否是游戏编号数字的子串
+                    idMatch = gameIdNumbers.includes(searchNumbers);
+                } else if (gameIdNumbers.length >= 5 && searchNumbers.length > 0) {
+                    // 从游戏编号中提取所有可能的5位数字组合进行匹配
+                    for (let i = 0; i <= gameIdNumbers.length - 5; i++) {
+                        const fiveDigit = gameIdNumbers.substring(i, i + 5);
+                        if (fiveDigit.includes(searchNumbers)) {
+                            idMatch = true;
+                            break;
+                        }
+                    }
+                }
+                
+                // 条件2：游戏名字有至少一个字符匹配
+                const nameMatch = gameName.split('').some(char => 
+                    searchTerm.includes(char)
+                );
+                
+                // 如果任一条件满足，则添加到结果
+                if (idMatch || nameMatch) {
+                    results.push({
+                        gameId,
+                        gameName,
+                        power,
+                        state,
+                        idMatch,
+                        nameMatch,
+                        searchTerm
+                    });
                 }
             });
+            
+            // 显示结果
+            if (results.length === 0) {
+                resultDiv.innerHTML = `
+                    <div class="text-center text-gray-500 py-10">
+                        <i class="fa fa-search text-4xl mb-3 opacity-30"></i>
+                        <p>未找到匹配的记录</p>
+                    </div>
+                `;
+            } else {
+                const resultHTML = results.map(item => `
+                    <div class="result-item">
+                        <p><strong>游戏编号:</strong> ${highlightMatch(item.gameId, item.searchTerm, item.idMatch)}</p>
+                        <p><strong>游戏名字:</strong> ${highlightMatch(item.gameName, item.searchTerm, item.nameMatch)}</p>
+                        <p><strong>战力:</strong> ${item.power}</p>
+                        <p><strong>所在州:</strong> ${item.state}</p>
+                    </div>
+                `).join('');
+                
+                resultDiv.innerHTML = `
+                    <div class="mb-4 text-gray-600">
+                        <i class="fa fa-check-circle text-green-500"></i> 找到 ${results.length} 条匹配记录
+                    </div>
+                    ${resultHTML}
+                `;
+            }
+        }
+        
+        // 清空搜索
+        function clearSearch() {
+            document.getElementById('searchTerm').value = '';
+            document.getElementById('result').innerHTML = `
+                <div class="text-center text-gray-500 py-10" id="initialMessage">
+                    <i class="fa fa-search-plus text-4xl mb-3 opacity-30"></i>
+                    <p>请输入查询关键词开始搜索</p>
+                </div>
+            `;
+        }
+        
+        // 高亮显示匹配的部分
+        function highlightMatch(text, term, isMatch) {
+            if (!isMatch || !term) return text;
+            
+            let result = text;
+            // 对每个字符进行检查，如果匹配则添加高亮
+            term.split('').forEach(char => {
+                if (result.includes(char)) {
+                    result = result.replace(
+                        new RegExp(`(${char})`, 'g'),
+                        '<span class="highlight">$1</span>'
+                    );
+                }
+            });
+            return result;
+        }
+        
+        // 支持回车键查询
+        document.getElementById('searchTerm').addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                search();
+            }
         });
     </script>
 </body>
+
 </html>
