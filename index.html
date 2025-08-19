@@ -28,7 +28,7 @@
                 @apply opacity-100 pointer-events-auto;
             }
             .modal {
-                @apply bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl transform scale-95 transition-transform duration-300;
+                @apply bg-white rounded rounded-lg shadow-xl p-6 w-full max-w-2xl transform scale-95 transition-transform duration-300;
             }
             .modal-backdrop.active .modal {
                 @apply scale-100;
@@ -66,7 +66,7 @@
     <div class="container mx-auto px-4 py-8 max-w-6xl">
         <header class="flex flex-col md:flex-row justify-between items-center mb-10">
             <div class="text-center md:text-left">
-                <h1 class="text-4xl font-bold text-gray-800 mb-2"> 人员查询系统-V2.1 </h1>
+                <h1 class="text-4xl font-bold text-gray-800 mb-2"> 人员查询系统-V2.2 </h1>
                 <p class="text-xl text-gray-600" id="subtitle">
                     1.作者QQ 3763877676
                 </p>
@@ -124,7 +124,7 @@
             </div>
             <p class="text-sm text-gray-500 mt-3">
                 <i class="fa fa-info-circle"></i> 游戏编号只要有5位数字匹配即可查询，游戏名字只要有一个字符匹配即可查询
-                <span class="text-red-500 ml-2"><i class="fa fa-user"></i> 查询需先登录账号/span>
+                <span class="text-red-500 ml-2"><i class="fa fa-user"></i> 查询需先登录账号</span>
             </p>
         </div>
 
@@ -363,15 +363,15 @@
     <script>
         // 初始化数据存储键名常量
         const STORAGE_KEYS = {
-            GAME_DATA: 'gameData_v21',
-            SYSTEM_USERS: 'systemUsers_v21',
-            PENDING_APPLICATIONS: 'pendingApplications_v21',
-            CURRENT_USER: 'currentUser_v21' // 新增：用于持久化当前用户状态
+            GAME_DATA: 'gameData_v22',
+            SYSTEM_USERS: 'systemUsers_v22',
+            PENDING_APPLICATIONS: 'pendingApplications_v22',
+            CURRENT_USER: 'currentUser_v22'
         };
 
         // 从本地存储加载游戏数据，若无则使用默认数据
         let gameData = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAME_DATA)) || [
-          ["749803924", "洛挽尘", 2033, "六合主州"],
+       ["749803924", "洛挽尘", 2033, "六合主州"],
             ["11541:756356949", "/嗨吧舞吧", 2833, "六合主州"],
             ["11444:749997510", "☆舞吧嗨吧", 2777, "六合主州"],
             ["11555:757269570", "弄花", 2751, "六合主州"],
@@ -1603,16 +1603,18 @@
 ["760156449", "小笼包", 506.5, "无极"],
 ["775819869", "北以", 370.8, "无极"],
 ["760023150", "枯词", 354.8, "无极"],
-["759895589", "金风玉露", 300, "无极"]
+["759895589", "金风玉露", 300, "无极"],
+["779946553", "可爱", 198.4, "无极"]
          ];
 
         // 系统常量
         const ADMIN_PASSWORD = "666"; // 管理员密码
-        const MAX_SEARCH_COUNT = 10; // 每个账号默认查询次数
+        const MAX_SEARCH_COUNT = 10; // 普通用户默认查询次数
+        const ADMIN_UNLIMITED_COUNT = 999999; // 管理员无限查询次数标记值
 
         // 从本地存储加载数据，若无则使用默认数据
         let systemUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_USERS)) || {
-            "七岚": { password: "1794", role: "管理员", searchCount: 9999 } // 管理员拥有大量查询次数
+            "七岚": { password: "1794", role: "管理员", searchCount: ADMIN_UNLIMITED_COUNT } // 管理员拥有无限查询次数
         };
         
         // 待审核的注册申请
@@ -1862,7 +1864,7 @@
                 closeAuthModal();
                 
                 if (currentUser.role === "管理员") {
-                    alert(`登录成功！欢迎您，管理员 ${currentUser.name}！`);
+                    alert(`登录成功！欢迎您，管理员 ${currentUser.name}！您拥有无限查询次数。`);
                 } else {
                     alert(`登录成功！欢迎您，${currentUser.role} ${currentUser.name}！您还有 ${currentUser.searchCount} 次查询机会。`);
                 }
@@ -1894,12 +1896,12 @@
                 document.getElementById('currentUser').textContent = 
                     `(当前用户: ${currentUser.name} - ${currentUser.role})`;
                 
-                // 管理员不显示查询次数限制
+                // 管理员不显示查询次数限制，显示"无限次"
                 if (currentUser.role !== "管理员") {
                     document.getElementById('searchRemaining').textContent = 
                         `(剩余查询次数: ${currentUser.searchCount})`;
                 } else {
-                    document.getElementById('searchRemaining').textContent = '';
+                    document.getElementById('searchRemaining').textContent = "(剩余查询次数: 无限次)";
                 }
             } else {
                 document.getElementById('currentUser').textContent = '';
@@ -1907,17 +1909,17 @@
             }
         }
 
-        // 退出登录功能（完全修复版）
+        // 退出登录功能
         function logout() {
             // 保存当前用户的查询次数
             if (currentUser) {
-                // 更新系统用户数据
-                if (systemUsers[currentUser.name]) {
+                // 更新系统用户数据（管理员查询次数保持无限）
+                if (systemUsers[currentUser.name] && currentUser.role !== "管理员") {
                     systemUsers[currentUser.name].searchCount = currentUser.searchCount;
                     localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
                 }
                 
-                // 清除当前用户状态（关键修复点）
+                // 清除当前用户状态
                 currentUser = null;
                 // 从本地存储中删除当前用户
                 localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
@@ -1931,7 +1933,7 @@
             updateUserInfoDisplay();
             clearSearch();
             
-            // 强制更新按钮状态（关键修复点）
+            // 强制更新按钮状态
             document.getElementById('loginBtn').classList.remove('hidden');
             document.getElementById('logoutBtn').classList.add('hidden');
             document.getElementById('adminBtn').classList.add('hidden');
@@ -2137,7 +2139,7 @@
             
             // 添加用户
             users.forEach(user => {
-                // 判断是否为管理员账号（受保护，无法删除）
+                // 判断是否为管理员账号（受保护，无法删除和修改查询次数）
                 const isAdmin = user.role === "管理员";
                 
                 const userElement = document.createElement('div');
@@ -2147,18 +2149,15 @@
                 // 管理员账号显示特殊标记
                 const adminBadge = isAdmin ? '<span class="ml-2 bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded">管理员</span>' : '';
                 
-                // 管理员账号不显示删除按钮
-                const deleteButton = isAdmin ? '' : `
-                    <button class="delete-user-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm">
-                        删除用户
-                    </button>
-                `;
+                // 管理员账号显示"无限次"而非具体数字
+                const displayCount = isAdmin ? '无限次' : user.searchCount;
                 
-                userElement.innerHTML = `
-                    <div>
-                        <p><strong>用户名:</strong> ${user.username}${adminBadge}</p>
-                        <p class="text-sm text-gray-500">当前查询次数: ${user.searchCount}</p>
+                // 管理员账号不显示删除按钮和次数设置功能
+                const managementControls = isAdmin ? `
+                    <div class="text-sm text-gray-500">
+                        管理员账号受保护
                     </div>
+                ` : `
                     <div class="flex gap-2 items-center">
                         <div class="w-24">
                             <input type="number" min="0" value="${user.searchCount}" class="count-input w-full px-2 py-1 border border-gray-300 rounded text-sm">
@@ -2166,8 +2165,18 @@
                         <button class="set-count-btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
                             设置次数
                         </button>
-                        ${deleteButton}
+                        <button class="delete-user-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm">
+                            删除用户
+                        </button>
                     </div>
+                `;
+                
+                userElement.innerHTML = `
+                    <div>
+                        <p><strong>用户名:</strong> ${user.username}${adminBadge}</p>
+                        <p class="text-sm text-gray-500">当前查询次数: ${displayCount}</p>
+                    </div>
+                    ${managementControls}
                 `;
                 
                 container.appendChild(userElement);
@@ -2179,7 +2188,16 @@
                 if (!userItem) return;
                 
                 const username = userItem.getAttribute('data-username');
+                const user = systemUsers[username];
+                
+                // 管理员账号不允许任何操作
+                if (user && user.role === "管理员") {
+                    return;
+                }
+                
                 const countInput = userItem.querySelector('.count-input');
+                if (!countInput) return;
+                
                 const count = parseInt(countInput.value) || 0;
                 
                 if (e.target.classList.contains('set-count-btn')) {
@@ -2189,12 +2207,19 @@
                 }
             });
             
-            // 输入框回车键也可以设置次数
+            // 输入框回车键也可以设置次数（仅普通用户）
             container.addEventListener('keyup', function(e) {
                 if (e.key === 'Enter' && e.target.classList.contains('count-input')) {
                     const userItem = e.target.closest('.user-item');
                     if (userItem) {
                         const username = userItem.getAttribute('data-username');
+                        const user = systemUsers[username];
+                        
+                        // 管理员账号不允许操作
+                        if (user && user.role === "管理员") {
+                            return;
+                        }
+                        
                         const count = parseInt(e.target.value) || 0;
                         setSearchCount(username, count);
                     }
@@ -2202,12 +2227,20 @@
             });
         }
 
-        // 直接设置用户查询次数
+        // 直接设置用户查询次数（仅普通用户）
         function setSearchCount(username, count) {
-            if (systemUsers[username]) {
+            const user = systemUsers[username];
+            
+            // 检查是否为管理员
+            if (user && user.role === "管理员") {
+                alert("管理员账号拥有永久无限查询次数，不可修改！");
+                return;
+            }
+            
+            if (user) {
                 // 确保次数不小于0
                 const newCount = Math.max(0, count);
-                systemUsers[username].searchCount = newCount;
+                user.searchCount = newCount;
                 
                 // 立即保存到本地存储
                 localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
@@ -2232,16 +2265,18 @@
             }
         }
 
-        // 删除用户（立即从界面移除并永久删除）
+        // 删除用户（仅普通用户）
         function deleteUser(username, userElement) {
-            // 再次检查是否为管理员（防止意外删除）
-            if (systemUsers[username] && systemUsers[username].role === "管理员") {
-                alert("管理员账号受保护，无法删除！");
+            const user = systemUsers[username];
+            
+            // 检查是否为管理员（防止意外删除）
+            if (user && user.role === "管理员") {
+                alert("管理员账号受到最高级保护，禁止删除！");
                 return;
             }
             
             if (confirm(`确定要永久删除用户 "${username}" 吗？此操作不可恢复！\n删除后该用户将无法登录，所有数据将被清除。`)) {
-                if (systemUsers[username]) {
+                if (user) {
                     // 1. 添加淡出动画类
                     userElement.classList.add('fade-out');
                     
@@ -2316,7 +2351,7 @@
         function approveApplication(index) {
             const app = pendingApplications[index];
             
-            // 添加到系统用户
+            // 添加到系统用户（默认为普通用户，有查询次数限制）
             systemUsers[app.username] = {
                 password: app.password,
                 role: "用户",
@@ -2333,7 +2368,7 @@
             // 刷新列表
             loadPendingApplications();
             
-            alert(`已批准用户 "${app.username}" 的注册申请`);
+            alert(`已批准用户 "${app.username}" 的注册申请，默认获得 ${MAX_SEARCH_COUNT} 次查询次数`);
         }
 
         // 拒绝注册申请
@@ -2352,7 +2387,7 @@
             alert(`已拒绝用户 "${app.username}" 的注册申请`);
         }
 
-        // 搜索功能
+        // 搜索功能（管理员无次数限制）
         function search() {
             // 未登录状态，不允许查询
             if (!currentUser) {
@@ -2396,6 +2431,8 @@
                 let remainingHtml = '';
                 if (currentUser.role !== "管理员") {
                     remainingHtml = `<p class="text-orange-500 mt-2">剩余查询次数: ${currentUser.searchCount}</p>`;
+                } else {
+                    remainingHtml = `<p class="text-green-500 mt-2">管理员拥有无限查询次数</p>`;
                 }
                 
                 resultDiv.innerHTML = `
@@ -2448,6 +2485,8 @@
                 let remainingHtml = '';
                 if (currentUser.role !== "管理员") {
                     remainingHtml = `<p class="text-orange-500 mt-2">剩余查询次数: ${currentUser.searchCount}</p>`;
+                } else {
+                    remainingHtml = `<p class="text-green-500 mt-2">管理员拥有无限查询次数</p>`;
                 }
                 
                 resultDiv.innerHTML = `
@@ -2467,6 +2506,8 @@
                 let remainingHtml = '';
                 if (currentUser.role !== "管理员") {
                     remainingHtml = `<span class="text-orange-500 ml-2">剩余查询次数: ${currentUser.searchCount}</span>`;
+                } else {
+                    remainingHtml = `<span class="text-green-500 ml-2">管理员拥有无限查询次数</span>`;
                 }
                 
                 const resultHTML = results.map(item => `
