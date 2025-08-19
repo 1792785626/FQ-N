@@ -95,14 +95,14 @@
             </div>
             <p class="text-sm text-gray-500 mt-3">
                 <i class="fa fa-info-circle"></i> 游戏编号只要有5位数字匹配即可查询，游戏名字只要有一个字符匹配即可查询
-                <span class="text-green-500 ml-2"><i class="fa fa-user"></i> 首次查询无需登录，后续需权限登录</span>
+                <span class="text-red-500 ml-2"><i class="fa fa-user"></i> 查询需先登录账号</span>
             </p>
         </div>
 
         <div id="result" class="bg-white rounded-lg shadow-md p-6 min-h-[200px]">
             <div class="text-center text-gray-500 py-10" id="initialMessage">
-                <i class="fa fa-search-plus text-4xl mb-3 opacity-30"></i>
-                <p>首次查询无需登录，直接输入关键词即可</p>
+                <i class="fa fa-user-lock text-4xl mb-3 opacity-30"></i>
+                <p>请先登录后再进行查询</p>
             </div>
         </div>
     </div>
@@ -1384,7 +1384,7 @@
 ["760023150", "枯词", 354.8, "无极"],
 ["759895589", "金风玉露", 300, "无极"],
 ["779946553", "可爱", 198.4, "无极"]
-        ];
+         ];
 
         // 系统用户账号
         const systemUsers = {
@@ -1394,21 +1394,9 @@
 
         // 当前登录用户
         let currentUser = null;
-        // 普通用户查询次数上限
-        const USER_MAX_SEARCH_COUNT = 5;
-        
-        // IP相关变量
-        let userIp = null;
-        // 存储IP查询记录的键名
-        const IP_RECORD_KEY = 'ip_search_records';
-        // 初始化IP查询记录，结构: { "ip地址": { searchCount: 次数, firstSearchDone: 是否已使用首次查询 } }
-        let ipSearchRecords = JSON.parse(localStorage.getItem(IP_RECORD_KEY)) || {};
 
         // 页面加载时初始化所有事件监听
         document.addEventListener('DOMContentLoaded', function() {
-            // 获取用户IP地址
-            getUserIp();
-            
             // 绑定所有按钮事件
             document.getElementById('loginBtn').onclick = openLoginModal;
             document.getElementById('logoutBtn').onclick = logout;
@@ -1420,43 +1408,6 @@
             // 初始化按钮状态
             updateButtonStates();
         });
-
-        // 获取用户IP地址
-        function getUserIp() {
-            // 使用第三方服务获取IP
-            fetch('https://api.ipify.org?format=json')
-                .then(response => response.json())
-                .then(data => {
-                    userIp = data.ip;
-                    // 初始化该IP的查询记录
-                    if (!ipSearchRecords[userIp]) {
-                        ipSearchRecords[userIp] = {
-                            searchCount: 0,
-                            firstSearchDone: false
-                        };
-                        saveIpSearchRecords();
-                    }
-                    updateButtonStates();
-                })
-                .catch(error => {
-                    console.error('获取IP地址失败:', error);
-                    // 失败时使用一个临时标识
-                    userIp = 'unknown_' + Math.random().toString(36).substr(2, 9);
-                    if (!ipSearchRecords[userIp]) {
-                        ipSearchRecords[userIp] = {
-                            searchCount: 0,
-                            firstSearchDone: false
-                        };
-                        saveIpSearchRecords();
-                    }
-                    updateButtonStates();
-                });
-        }
-
-        // 保存IP查询记录到localStorage
-        function saveIpSearchRecords() {
-            localStorage.setItem(IP_RECORD_KEY, JSON.stringify(ipSearchRecords));
-        }
 
         // 更新按钮状态（登录/退出和查询按钮）
         function updateButtonStates() {
@@ -1471,42 +1422,17 @@
             searchBtn.classList.remove('btn-disabled');
             searchBtn.removeAttribute('disabled');
             
-            // 获取当前IP的查询记录
-            const ipRecord = userIp ? ipSearchRecords[userIp] : null;
-            
             // 检查是否已登录
             if (currentUser) {
                 // 已登录状态
                 loginBtn.classList.add('hidden');
                 logoutBtn.classList.remove('hidden');
-                
-                if (currentUser.role === "管理员") {
-                    // 管理员：始终可以查询
-                    initialMessage.textContent = "请输入查询关键词开始搜索";
-                } else {
-                    // 普通用户：根据IP查询次数决定
-                    const remaining = USER_MAX_SEARCH_COUNT - (ipRecord ? ipRecord.searchCount : 0);
-                    initialMessage.textContent = remaining > 0 ? 
-                        `您还有 ${remaining} 次查询机会，请输入关键词` : 
-                        "您的查询次数已用完（同一IP永久限制5次）";
-                        
-                    // 如果次数用完，禁用查询按钮
-                    if (remaining <= 0) {
-                        searchBtn.classList.add('btn-disabled');
-                        searchBtn.setAttribute('disabled', 'disabled');
-                    }
-                }
+                initialMessage.textContent = "请输入查询关键词开始搜索";
             } else {
-                // 未登录状态，检查IP是否已使用首次查询权限
-                if (ipRecord && ipRecord.firstSearchDone) {
-                    // 已使用首次查询权限，需要登录
-                    searchBtn.classList.add('btn-disabled');
-                    searchBtn.setAttribute('disabled', 'disabled');
-                    initialMessage.textContent = "首次查询已使用，请登录后继续查询";
-                } else {
-                    // 首次查询权限未使用，可以直接查询
-                    initialMessage.textContent = "首次查询无需登录，直接输入关键词即可";
-                }
+                // 未登录状态，禁用查询按钮
+                searchBtn.classList.add('btn-disabled');
+                searchBtn.setAttribute('disabled', 'disabled');
+                initialMessage.textContent = "请先登录后再进行查询";
             }
         }
 
@@ -1553,14 +1479,7 @@
                 updateButtonStates();
                 
                 closeLoginModal();
-                
-                // 显示登录信息，包含剩余查询次数
-                if (currentUser.role === "用户") {
-                    const remaining = USER_MAX_SEARCH_COUNT - ipSearchRecords[userIp].searchCount;
-                    alert(`登录成功！欢迎您，${currentUser.role} ${currentUser.name}！您还剩 ${remaining} 次查询机会（同一IP永久限制5次）。`);
-                } else {
-                    alert(`登录成功！欢迎您，${currentUser.role} ${currentUser.name}！`);
-                }
+                alert(`登录成功！欢迎您，${currentUser.role} ${currentUser.name}！`);
             } else {
                 errorElement.classList.remove('hidden');
                 const inputs = [document.getElementById('username'), document.getElementById('password')];
@@ -1573,7 +1492,7 @@
 
         // 退出登录功能
         function logout() {
-            // 清除用户状态，但保留IP查询记录
+            // 清除用户状态
             currentUser = null;
             
             // 更新UI显示
@@ -1589,40 +1508,11 @@
 
         // 搜索功能
         function search() {
-            // 获取当前IP的查询记录
-            const ipRecord = userIp ? ipSearchRecords[userIp] : null;
-            
-            if (!ipRecord) {
-                alert("系统正在获取您的信息，请稍后再试！");
-                return;
-            }
-            
-            // 检查是否已登录
+            // 未登录状态，不允许查询
             if (!currentUser) {
-                // 未登录状态，检查IP是否有查询权限
-                if (ipRecord.firstSearchDone) {
-                    // 已使用首次查询权限，需要登录
-                    alert("您的首次查询权限已使用，请登录后继续查询！");
-                    openLoginModal();
-                    return;
-                } else {
-                    // 首次查询，允许执行，但标记为已使用
-                    ipRecord.searchCount++;
-                    ipRecord.firstSearchDone = true;
-                    saveIpSearchRecords();
-                }
-            } else {
-                // 已登录状态，检查普通用户查询次数
-                if (currentUser.role === "用户" && ipRecord.searchCount >= USER_MAX_SEARCH_COUNT) {
-                    alert("您的查询次数已用完（同一IP永久限制5次）！");
-                    return;
-                }
-                
-                // 普通用户查询次数加1
-                if (currentUser.role === "用户") {
-                    ipRecord.searchCount++;
-                    saveIpSearchRecords();
-                }
+                alert("请先登录后再进行查询！");
+                openLoginModal();
+                return;
             }
             
             const searchTerm = document.getElementById('searchTerm').value.trim();
@@ -1678,32 +1568,13 @@
             
             // 显示查询结果
             if (results.length === 0) {
-                let extraMessage = '';
-                if (!currentUser) {
-                    extraMessage = '<p class="text-orange-500 mt-2">您的首次查询权限已使用，下次查询需登录</p>';
-                } else if (currentUser.role === "用户") {
-                    const remaining = USER_MAX_SEARCH_COUNT - ipRecord.searchCount;
-                    extraMessage = `<p class="text-orange-500 mt-2">剩余查询次数: ${remaining} (同一IP永久限制5次)</p>`;
-                }
-                
                 resultDiv.innerHTML = `
                     <div class="text-center text-gray-500 py-10">
                         <i class="fa fa-search text-4xl mb-3 opacity-30"></i>
                         <p>未找到匹配的记录</p>
-                        ${extraMessage}
                     </div>
                 `;
             } else {
-                let extraMessage = '';
-                if (!currentUser) {
-                    extraMessage = '<span class="text-orange-500 ml-2">您的首次查询权限已使用，下次查询需登录</span>';
-                } else if (currentUser.role === "用户") {
-                    const remaining = USER_MAX_SEARCH_COUNT - ipRecord.searchCount;
-                    extraMessage = remaining > 0 ? 
-                        `<span class="text-orange-500 ml-2">剩余查询次数: ${remaining} (同一IP永久限制5次)</span>` : 
-                        `<span class="text-red-500 ml-2">您的查询次数已用完（同一IP永久限制5次）</span>`;
-                }
-                
                 const resultHTML = results.map(item => `
                     <div class="result-item">
                         <p><strong>游戏编号:</strong> ${highlightMatch(item.gameId, item.searchTerm, item.idMatch)}</p>
@@ -1716,35 +1587,19 @@
                 resultDiv.innerHTML = `
                     <div class="mb-4 text-gray-600">
                         <i class="fa fa-check-circle text-green-500"></i> 找到 ${results.length} 条匹配记录
-                        ${extraMessage}
                     </div>
                     ${resultHTML}
                 `;
             }
-            
-            // 更新按钮状态
-            updateButtonStates();
         }
         
         // 清空搜索
         function clearSearch() {
             document.getElementById('searchTerm').value = '';
-            let message = "首次查询无需登录，直接输入关键词即可";
-            
-            // 获取当前IP的查询记录
-            const ipRecord = userIp ? ipSearchRecords[userIp] : null;
+            let message = "请先登录后再进行查询";
             
             if (currentUser) {
-                if (currentUser.role === "管理员") {
-                    message = "请输入查询关键词开始搜索";
-                } else {
-                    const remaining = USER_MAX_SEARCH_COUNT - (ipRecord ? ipRecord.searchCount : 0);
-                    message = remaining > 0 ? 
-                        `您还有 ${remaining} 次查询机会，请输入关键词（同一IP永久限制5次）` : 
-                        "您的查询次数已用完（同一IP永久限制5次）";
-                }
-            } else if (ipRecord && ipRecord.firstSearchDone) {
-                message = "首次查询已使用，请登录后继续查询";
+                message = "请输入查询关键词开始搜索";
             }
             
             document.getElementById('result').innerHTML = `
@@ -1800,3 +1655,4 @@
 </body>
 
 </html>
+    
