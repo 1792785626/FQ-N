@@ -28,13 +28,35 @@
                 @apply opacity-100 pointer-events-auto;
             }
             .modal {
-                @apply bg-white rounded-lg shadow-xl p-6 w-full max-w-md transform scale-95 transition-transform duration-300;
+                @apply bg-white rounded-lg shadow-xl p-6 w-full max-w-2xl transform scale-95 transition-transform duration-300;
             }
             .modal-backdrop.active .modal {
                 @apply scale-100;
             }
             .btn-disabled {
                 @apply opacity-50 cursor-not-allowed hover:bg-blue-600;
+            }
+            .tab-active {
+                @apply text-purple-600 border-purple-600 font-medium;
+            }
+            .pending-item, .user-item {
+                @apply p-3 border border-gray-200 bg-gray-50 rounded mb-2 flex justify-between items-center;
+            }
+            .pending-item {
+                @apply border-yellow-200 bg-yellow-50;
+            }
+            .admin-tab {
+                @apply py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors;
+            }
+            .admin-tab.active {
+                @apply text-red-600 border-red-600 font-medium;
+            }
+            .fade-out {
+                animation: fadeOut 0.3s ease-out forwards;
+            }
+            @keyframes fadeOut {
+                from { opacity: 1; transform: scale(1); }
+                to { opacity: 0; transform: scale(0.95); height: 0; margin: 0; padding: 0; overflow: hidden; }
             }
         }
     </style>
@@ -44,18 +66,25 @@
     <div class="container mx-auto px-4 py-8 max-w-6xl">
         <header class="flex flex-col md:flex-row justify-between items-center mb-10">
             <div class="text-center md:text-left">
-                <h1 class="text-4xl font-bold text-gray-800 mb-2"> 人员查询系统-V1.2 </h1>
-                <pp class="text-xl text-gray-600" id="subtitle">
+                <h1 class="text-4xl font-bold text-gray-800 mb-2"> 人员查询系统-V2.1 </h1>
+                <p class="text-xl text-gray-600" id="subtitle">
                     1.作者QQ 3763877676
-                </pp>
-                 <ppp class="text-xl text-gray-600" id="subtitle">
+                </p>
+                 <p class="text-xl text-gray-600" id="subtitle">
                     2.系统名单还在完善中，欢迎大家一起合作开发
-                </ppp>
+                </p>
                 <p class="text-xl text-gray-600" id="subtitle">盛世开发组收录
                     <span id="currentUser" class="text-blue-600 ml-2"></span>
+                    <span id="searchRemaining" class="text-orange-600 ml-2"></span>
                 </p>
             </div>
             <div class="flex gap-2 mt-3 md:mt-0">
+                <button 
+                    id="adminBtn" 
+                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-transform hidden"
+                >
+                    <i class="fa fa-cog mr-1"></i>后台管理
+                </button>
                 <button 
                     id="loginBtn" 
                     class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors text-sm shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-transform"
@@ -95,7 +124,7 @@
             </div>
             <p class="text-sm text-gray-500 mt-3">
                 <i class="fa fa-info-circle"></i> 游戏编号只要有5位数字匹配即可查询，游戏名字只要有一个字符匹配即可查询
-                <span class="text-red-500 ml-2"><i class="fa fa-user"></i> 查询需先登录账号</span>
+                <span class="text-red-500 ml-2"><i class="fa fa-user"></i> 查询需先登录账号/span>
             </p>
         </div>
 
@@ -107,50 +136,242 @@
         </div>
     </div>
 
-    <!-- 登录弹窗 -->
-    <div id="loginModal" class="modal-backdrop">
-        <div class="modal">
-            <h3 class="text-xl font-bold mb-4 text-center">权限登录</h3>
-            <div class="mb-4">
-                <label class="block text-gray-700 mb-2" for="username">用户名</label>
-                <input 
-                    type="text" 
-                    id="username" 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                    placeholder="请输入用户名"
-                >
-            </div>
-            <div class="mb-6">
-                <label class="block text-gray-700 mb-2" for="password">密码</label>
-                <input 
-                    type="password" 
-                    id="password" 
-                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
-                    placeholder="请输入密码"
-                >
-            </div>
-            <div class="flex gap-3">
-                <button 
-                    id="modalLoginBtn"
-                    class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors shadow hover:shadow-md"
-                >
+    <!-- 登录/注册弹窗 -->
+    <div id="authModal" class="modal-backdrop">
+        <div class="modal max-w-md">
+            <!-- 标签切换 -->
+            <div class="flex border-b mb-4">
+                <button id="loginTab" class="py-2 px-4 border-b-2 tab-active transition-colors">
                     登录
                 </button>
-                <button 
-                    id="modalCloseBtn"
-                    class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition-colors"
-                >
-                    取消
+                <button id="registerTab" class="py-2 px-4 border-b-2 border-transparent text-gray-500 hover:text-gray-700 transition-colors">
+                    注册
                 </button>
             </div>
-            <p id="loginError" class="text-red-500 text-sm mt-3 text-center hidden animate-pulse">登录失败，请检查用户名和密码</p>
+            
+            <!-- 登录表单 -->
+            <div id="loginForm">
+                <h3 class="text-xl font-bold mb-4 text-center">权限登录</h3>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2" for="loginUsername">用户名</label>
+                    <input 
+                        type="text" 
+                        id="loginUsername" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        placeholder="请输入用户名"
+                    >
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2" for="loginPassword">密码</label>
+                    <input 
+                        type="password" 
+                        id="loginPassword" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        placeholder="请输入密码"
+                    >
+                </div>
+                <div class="flex gap-3">
+                    <button 
+                        id="modalLoginBtn"
+                        class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg transition-colors shadow hover:shadow-md"
+                    >
+                        登录
+                    </button>
+                    <button 
+                        id="modalCloseBtn"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition-colors"
+                    >
+                        取消
+                    </button>
+                </div>
+                <p id="loginError" class="text-red-500 text-sm mt-3 text-center hidden animate-pulse">登录失败，请检查用户名和密码</p>
+            </div>
+            
+            <!-- 注册表单 -->
+            <div id="registerForm" class="hidden">
+                <h3 class="text-xl font-bold mb-4 text-center">账号注册申请</h3>
+                <p class="text-sm text-gray-500 mb-4">注册申请提交后，需等待管理员审核通过才能使用</p>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2" for="regUsername">用户名</label>
+                    <input 
+                        type="text" 
+                        id="regUsername" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        placeholder="请设置用户名"
+                    >
+                </div>
+                <div class="mb-4">
+                    <label class="block text-gray-700 mb-2" for="regPassword">密码</label>
+                    <input 
+                        type="password" 
+                        id="regPassword" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        placeholder="请设置密码（至少6位）"
+                    >
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 mb-2" for="regConfirmPassword">确认密码</label>
+                    <input 
+                        type="password" 
+                        id="regConfirmPassword" 
+                        class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
+                        placeholder="请再次输入密码"
+                    >
+                </div>
+                <div class="flex gap-3">
+                    <button 
+                        id="modalRegisterBtn"
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition-colors shadow hover:shadow-md"
+                    >
+                        提交申请
+                    </button>
+                    <button 
+                        id="modalCancelRegisterBtn"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition-colors"
+                    >
+                        取消
+                    </button>
+                </div>
+                <p id="registerError" class="text-red-500 text-sm mt-3 text-center hidden animate-pulse"></p>
+                <p id="registerSuccess" class="text-green-500 text-sm mt-3 text-center hidden animate-pulse">申请已提交，请等待管理员审核</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 管理员审核弹窗 -->
+    <div id="adminModal" class="modal-backdrop">
+        <div class="modal">
+            <h3 class="text-xl font-bold mb-4 text-center">后台管理中心</h3>
+            
+            <div class="mb-4">
+                <label class="block text-gray-700 mb-2" for="adminPassword">管理员密码</label>
+                <input 
+                    type="password" 
+                    id="adminPassword" 
+                    class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+                    placeholder="请输入管理员密码"
+                >
+                <p class="text-red-500 text-sm mt-1 hidden" id="adminAuthError">密码错误，请重试</p>
+            </div>
+            
+            <div id="adminContent" class="hidden">
+                <!-- 管理员功能标签 -->
+                <div class="flex border-b mb-4">
+                    <button id="applicationTab" class="admin-tab active">
+                        注册申请管理
+                    </button>
+                    <button id="userManagementTab" class="admin-tab">
+                        用户管理
+                    </button>
+                    <button id="dataManagementTab" class="admin-tab">
+                        数据管理
+                    </button>
+                </div>
+                
+                <!-- 注册申请管理 -->
+                <div id="applicationManagement">
+                    <p class="text-gray-600 mb-3">待审核申请：<span id="pendingCount">0</span></p>
+                    
+                    <div id="pendingApplications" class="max-h-60 overflow-y-auto mb-4">
+                        <!-- 待审核申请将在这里动态显示 -->
+                        <p class="text-gray-500 text-center py-4" id="noPending">暂无待审核申请</p>
+                    </div>
+                </div>
+                
+                <!-- 用户管理 -->
+                <div id="userManagement" class="hidden">
+                    <p class="text-gray-600 mb-3">已注册用户：<span id="userCount">0</span></p>
+                    
+                    <div id="registeredUsers" class="max-h-60 overflow-y-auto mb-4">
+                        <!-- 已注册用户将在这里动态显示 -->
+                        <p class="text-gray-500 text-center py-4" id="noUsers">暂无注册用户</p>
+                    </div>
+                </div>
+                
+                <!-- 数据管理 -->
+                <div id="dataManagement" class="hidden">
+                    <h4 class="font-bold mb-3">游戏数据管理</h4>
+                    <p class="text-sm text-gray-500 mb-4">添加新的游戏数据到系统中</p>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+                        <div>
+                            <label class="block text-gray-700 mb-1 text-sm" for="gameId">游戏编号</label>
+                            <input 
+                                type="text" 
+                                id="gameId" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all text-sm"
+                                placeholder="输入游戏编号"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-1 text-sm" for="gameName">游戏名字</label>
+                            <input 
+                                type="text" 
+                                id="gameName" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all text-sm"
+                                placeholder="输入游戏名字"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-1 text-sm" for="gamePower">战力</label>
+                            <input 
+                                type="number" 
+                                id="gamePower" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all text-sm"
+                                placeholder="输入战力值"
+                            >
+                        </div>
+                        <div>
+                            <label class="block text-gray-700 mb-1 text-sm" for="gameState">所在州</label>
+                            <input 
+                                type="text" 
+                                id="gameState" 
+                                class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 transition-all text-sm"
+                                placeholder="输入所在州"
+                            >
+                        </div>
+                    </div>
+                    
+                    <button 
+                        id="addGameDataBtn"
+                        class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition-colors text-sm"
+                    >
+                        <i class="fa fa-plus mr-1"></i>添加游戏数据
+                    </button>
+                    <p id="dataAddSuccess" class="text-green-500 text-sm mt-2 hidden">数据添加成功！</p>
+                    <p id="dataAddError" class="text-red-500 text-sm mt-2 hidden">请填写完整的游戏数据！</p>
+                </div>
+                
+                <div class="flex gap-3 mt-4">
+                    <button 
+                        id="refreshBtn"
+                        class="flex-1 bg-gray-600 hover:bg-gray-700 text-white py-2 rounded-lg transition-colors"
+                    >
+                        <i class="fa fa-refresh mr-1"></i>刷新
+                    </button>
+                    <button 
+                        id="closeAdminModal"
+                        class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg transition-colors"
+                    >
+                        关闭
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // 全部游戏数据
-        const gameData = [
-            ["749803924", "洛挽尘", 2033, "六合主州"],
+        // 初始化数据存储键名常量
+        const STORAGE_KEYS = {
+            GAME_DATA: 'gameData_v21',
+            SYSTEM_USERS: 'systemUsers_v21',
+            PENDING_APPLICATIONS: 'pendingApplications_v21',
+            CURRENT_USER: 'currentUser_v21' // 新增：用于持久化当前用户状态
+        };
+
+        // 从本地存储加载游戏数据，若无则使用默认数据
+        let gameData = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAME_DATA)) || [
+          ["749803924", "洛挽尘", 2033, "六合主州"],
             ["11541:756356949", "/嗨吧舞吧", 2833, "六合主州"],
             ["11444:749997510", "☆舞吧嗨吧", 2777, "六合主州"],
             ["11555:757269570", "弄花", 2751, "六合主州"],
@@ -1382,43 +1603,362 @@
 ["760156449", "小笼包", 506.5, "无极"],
 ["775819869", "北以", 370.8, "无极"],
 ["760023150", "枯词", 354.8, "无极"],
-["759895589", "金风玉露", 300, "无极"],
-["779946553", "可爱", 198.4, "无极"]
+["759895589", "金风玉露", 300, "无极"]
          ];
 
-        // 系统用户账号
-        const systemUsers = {
-            "七岚": { password: "1794", role: "管理员" },
-            "其他": { password: "6", role: "用户" }
-        };
+        // 系统常量
+        const ADMIN_PASSWORD = "666"; // 管理员密码
+        const MAX_SEARCH_COUNT = 10; // 每个账号默认查询次数
 
-        // 当前登录用户
-        let currentUser = null;
+        // 从本地存储加载数据，若无则使用默认数据
+        let systemUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_USERS)) || {
+            "七岚": { password: "1794", role: "管理员", searchCount: 9999 } // 管理员拥有大量查询次数
+        };
+        
+        // 待审核的注册申请
+        let pendingApplications = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_APPLICATIONS)) || [];
+
+        // 当前登录用户 - 从本地存储加载
+        let currentUser = JSON.parse(localStorage.getItem(STORAGE_KEYS.CURRENT_USER)) || null;
 
         // 页面加载时初始化所有事件监听
         document.addEventListener('DOMContentLoaded', function() {
             // 绑定所有按钮事件
-            document.getElementById('loginBtn').onclick = openLoginModal;
-            document.getElementById('logoutBtn').onclick = logout;
-            document.getElementById('searchBtn').onclick = search;
-            document.getElementById('clearBtn').onclick = clearSearch;
-            document.getElementById('modalLoginBtn').onclick = login;
-            document.getElementById('modalCloseBtn').onclick = closeLoginModal;
+            document.getElementById('loginBtn').addEventListener('click', openAuthModal);
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('searchBtn').addEventListener('click', search);
+            document.getElementById('clearBtn').addEventListener('click', clearSearch);
+            document.getElementById('modalLoginBtn').addEventListener('click', login);
+            document.getElementById('modalCloseBtn').addEventListener('click', closeAuthModal);
+            document.getElementById('modalRegisterBtn').addEventListener('click', submitRegistration);
+            document.getElementById('modalCancelRegisterBtn').addEventListener('click', closeAuthModal);
+            document.getElementById('adminBtn').addEventListener('click', openAdminModal);
+            document.getElementById('closeAdminModal').addEventListener('click', closeAdminModal);
+            document.getElementById('refreshBtn').addEventListener('click', refreshAdminData);
+            document.getElementById('addGameDataBtn').addEventListener('click', addGameData);
             
+            // 绑定标签切换事件
+            document.getElementById('loginTab').addEventListener('click', () => switchTab('login'));
+            document.getElementById('registerTab').addEventListener('click', () => switchTab('register'));
+            
+            // 绑定管理员标签切换
+            document.getElementById('applicationTab').addEventListener('click', () => switchAdminTab('application'));
+            document.getElementById('userManagementTab').addEventListener('click', () => switchAdminTab('user'));
+            document.getElementById('dataManagementTab').addEventListener('click', () => switchAdminTab('data'));
+            
+            // 绑定管理员密码验证
+            document.getElementById('adminPassword').addEventListener('keyup', function(e) {
+                if (e.key === 'Enter') {
+                    verifyAdminPassword();
+                }
+            });
+            
+            // 初始化用户信息显示（如果有保存的登录状态）
+            updateUserInfoDisplay();
             // 初始化按钮状态
             updateButtonStates();
         });
+
+        // 切换登录/注册标签
+        function switchTab(tabType) {
+            const loginTab = document.getElementById('loginTab');
+            const registerTab = document.getElementById('registerTab');
+            const loginForm = document.getElementById('loginForm');
+            const registerForm = document.getElementById('registerForm');
+            
+            // 重置所有状态
+            loginTab.classList.remove('tab-active');
+            registerTab.classList.remove('tab-active');
+            loginForm.classList.add('hidden');
+            registerForm.classList.add('hidden');
+            document.getElementById('loginError').classList.add('hidden');
+            document.getElementById('registerError').classList.add('hidden');
+            document.getElementById('registerSuccess').classList.add('hidden');
+            
+            // 设置选中状态
+            if (tabType === 'login') {
+                loginTab.classList.add('tab-active');
+                loginForm.classList.remove('hidden');
+                document.getElementById('loginUsername').focus();
+            } else {
+                registerTab.classList.add('tab-active');
+                registerForm.classList.remove('hidden');
+                document.getElementById('regUsername').focus();
+            }
+        }
+
+        // 切换管理员标签
+        function switchAdminTab(tabType) {
+            // 重置所有标签状态
+            document.getElementById('applicationTab').classList.remove('active');
+            document.getElementById('userManagementTab').classList.remove('active');
+            document.getElementById('dataManagementTab').classList.remove('active');
+            
+            // 重置所有内容区域
+            document.getElementById('applicationManagement').classList.add('hidden');
+            document.getElementById('userManagement').classList.add('hidden');
+            document.getElementById('dataManagement').classList.add('hidden');
+            document.getElementById('dataAddSuccess').classList.add('hidden');
+            document.getElementById('dataAddError').classList.add('hidden');
+            
+            // 设置选中状态
+            if (tabType === 'application') {
+                document.getElementById('applicationTab').classList.add('active');
+                document.getElementById('applicationManagement').classList.remove('hidden');
+                loadPendingApplications();
+            } else if (tabType === 'user') {
+                document.getElementById('userManagementTab').classList.add('active');
+                document.getElementById('userManagement').classList.remove('hidden');
+                loadRegisteredUsers();
+            } else if (tabType === 'data') {
+                document.getElementById('dataManagementTab').classList.add('active');
+                document.getElementById('dataManagement').classList.remove('hidden');
+                // 清空数据输入框
+                document.getElementById('gameId').value = '';
+                document.getElementById('gameName').value = '';
+                document.getElementById('gamePower').value = '';
+                document.getElementById('gameState').value = '';
+            }
+        }
+
+        // 打开认证弹窗
+        function openAuthModal() {
+            const modal = document.getElementById('authModal');
+            modal.classList.remove('hidden', 'active');
+            void modal.offsetWidth; // 触发重绘以启用过渡动画
+            modal.classList.add('active');
+            
+            // 重置表单
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+            document.getElementById('regUsername').value = '';
+            document.getElementById('regPassword').value = '';
+            document.getElementById('regConfirmPassword').value = '';
+            
+            // 显示登录标签
+            switchTab('login');
+        }
+
+        // 关闭认证弹窗
+        function closeAuthModal() {
+            const modal = document.getElementById('authModal');
+            modal.classList.remove('active');
+            
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 300);
+        }
+
+        // 提交注册申请
+        function submitRegistration() {
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+            const confirmPassword = document.getElementById('regConfirmPassword').value.trim();
+            const errorElement = document.getElementById('registerError');
+            const successElement = document.getElementById('registerSuccess');
+            
+            // 重置提示
+            errorElement.classList.add('hidden');
+            successElement.classList.add('hidden');
+            
+            // 验证
+            if (!username) {
+                showRegisterError('请输入用户名');
+                return;
+            }
+            
+            // 检查用户名是否已存在或待审核
+            const existsInSystem = systemUsers[username] !== undefined;
+            const existsInPending = pendingApplications.some(app => app.username === username);
+            
+            if (existsInSystem || existsInPending) {
+                showRegisterError('用户名已存在或正在审核中');
+                return;
+            }
+            
+            if (password.length < 6) {
+                showRegisterError('密码长度至少6位');
+                return;
+            }
+            
+            if (password !== confirmPassword) {
+                showRegisterError('两次输入的密码不一致');
+                return;
+            }
+            
+            // 添加到待审核列表
+            pendingApplications.push({
+                username: username,
+                password: password,
+                timestamp: new Date().toISOString()
+            });
+            
+            // 保存到本地存储
+            localStorage.setItem(STORAGE_KEYS.PENDING_APPLICATIONS, JSON.stringify(pendingApplications));
+            
+            // 显示成功信息
+            successElement.classList.remove('hidden');
+            
+            // 3秒后自动切换到登录标签
+            setTimeout(() => {
+                switchTab('login');
+                document.getElementById('loginUsername').value = username;
+                document.getElementById('loginPassword').focus();
+            }, 1500);
+        }
+
+        // 显示注册错误信息
+        function showRegisterError(message) {
+            const errorElement = document.getElementById('registerError');
+            errorElement.textContent = message;
+            errorElement.classList.remove('hidden');
+            
+            // 添加输入框错误样式
+            const inputs = [
+                document.getElementById('regUsername'),
+                document.getElementById('regPassword'),
+                document.getElementById('regConfirmPassword')
+            ];
+            
+            inputs.forEach(input => {
+                input.classList.add('border-red-500');
+                setTimeout(() => input.classList.remove('border-red-500'), 2000);
+            });
+        }
+
+        // 登录功能
+        function login() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
+            const errorElement = document.getElementById('loginError');
+
+            if (systemUsers[username] && systemUsers[username].password === password) {
+                // 检查账号是否还有查询次数（管理员不受限制）
+                if (systemUsers[username].role !== "管理员" && systemUsers[username].searchCount <= 0) {
+                    errorElement.textContent = '该账号查询次数已用完，已被自动注销';
+                    errorElement.classList.remove('hidden');
+                    
+                    // 从系统中移除该账号
+                    delete systemUsers[username];
+                    localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+                    return;
+                }
+                
+                currentUser = {
+                    name: username,
+                    role: systemUsers[username].role,
+                    searchCount: systemUsers[username].searchCount
+                };
+                
+                // 保存当前用户状态到本地存储
+                localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+                
+                // 显示当前用户信息和剩余查询次数
+                updateUserInfoDisplay();
+                
+                // 更新按钮状态
+                updateButtonStates();
+                
+                closeAuthModal();
+                
+                if (currentUser.role === "管理员") {
+                    alert(`登录成功！欢迎您，管理员 ${currentUser.name}！`);
+                } else {
+                    alert(`登录成功！欢迎您，${currentUser.role} ${currentUser.name}！您还有 ${currentUser.searchCount} 次查询机会。`);
+                }
+            } else {
+                // 检查是否在待审核列表中
+                const pendingApp = pendingApplications.find(app => app.username === username);
+                if (pendingApp) {
+                    errorElement.textContent = '您的注册申请正在审核中，请耐心等待';
+                } else {
+                    errorElement.textContent = '登录失败，请检查用户名和密码';
+                }
+                errorElement.classList.remove('hidden');
+                
+                const inputs = [
+                    document.getElementById('loginUsername'),
+                    document.getElementById('loginPassword')
+                ];
+                
+                inputs.forEach(input => {
+                    input.classList.add('border-red-500');
+                    setTimeout(() => input.classList.remove('border-red-500'), 2000);
+                });
+            }
+        }
+
+        // 更新用户信息显示
+        function updateUserInfoDisplay() {
+            if (currentUser) {
+                document.getElementById('currentUser').textContent = 
+                    `(当前用户: ${currentUser.name} - ${currentUser.role})`;
+                
+                // 管理员不显示查询次数限制
+                if (currentUser.role !== "管理员") {
+                    document.getElementById('searchRemaining').textContent = 
+                        `(剩余查询次数: ${currentUser.searchCount})`;
+                } else {
+                    document.getElementById('searchRemaining').textContent = '';
+                }
+            } else {
+                document.getElementById('currentUser').textContent = '';
+                document.getElementById('searchRemaining').textContent = '';
+            }
+        }
+
+        // 退出登录功能（完全修复版）
+        function logout() {
+            // 保存当前用户的查询次数
+            if (currentUser) {
+                // 更新系统用户数据
+                if (systemUsers[currentUser.name]) {
+                    systemUsers[currentUser.name].searchCount = currentUser.searchCount;
+                    localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+                }
+                
+                // 清除当前用户状态（关键修复点）
+                currentUser = null;
+                // 从本地存储中删除当前用户
+                localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+            }
+            
+            // 关闭任何打开的模态框
+            closeAuthModal();
+            closeAdminModal();
+            
+            // 更新UI显示
+            updateUserInfoDisplay();
+            clearSearch();
+            
+            // 强制更新按钮状态（关键修复点）
+            document.getElementById('loginBtn').classList.remove('hidden');
+            document.getElementById('logoutBtn').classList.add('hidden');
+            document.getElementById('adminBtn').classList.add('hidden');
+            
+            // 重置搜索按钮状态
+            document.getElementById('searchBtn').classList.add('btn-disabled');
+            document.getElementById('searchBtn').setAttribute('disabled', 'disabled');
+            
+            // 更新初始消息
+            document.querySelector('#initialMessage p').textContent = "请先登录后再进行查询";
+            
+            // 显示退出成功信息
+            alert("已成功退出登录");
+        }
 
         // 更新按钮状态（登录/退出和查询按钮）
         function updateButtonStates() {
             const loginBtn = document.getElementById('loginBtn');
             const logoutBtn = document.getElementById('logoutBtn');
+            const adminBtn = document.getElementById('adminBtn');
             const searchBtn = document.getElementById('searchBtn');
             const initialMessage = document.querySelector('#initialMessage p');
             
             // 重置状态
             loginBtn.classList.remove('hidden');
             logoutBtn.classList.add('hidden');
+            adminBtn.classList.add('hidden');
             searchBtn.classList.remove('btn-disabled');
             searchBtn.removeAttribute('disabled');
             
@@ -1427,7 +1967,24 @@
                 // 已登录状态
                 loginBtn.classList.add('hidden');
                 logoutBtn.classList.remove('hidden');
-                initialMessage.textContent = "请输入查询关键词开始搜索";
+                
+                // 管理员显示管理按钮
+                if (currentUser.role === "管理员") {
+                    adminBtn.classList.remove('hidden');
+                }
+                
+                // 检查是否还有查询次数（管理员不受限制）
+                if (currentUser.role !== "管理员" && currentUser.searchCount <= 0) {
+                    searchBtn.classList.add('btn-disabled');
+                    searchBtn.setAttribute('disabled', 'disabled');
+                    initialMessage.textContent = "您的查询次数已用完，账号将被自动注销";
+                } else {
+                    if (currentUser.role === "管理员") {
+                        initialMessage.textContent = "请输入查询关键词开始搜索（管理员无查询次数限制）";
+                    } else {
+                        initialMessage.textContent = `请输入查询关键词开始搜索（剩余 ${currentUser.searchCount} 次）`;
+                    }
+                }
             } else {
                 // 未登录状态，禁用查询按钮
                 searchBtn.classList.add('btn-disabled');
@@ -1436,22 +1993,23 @@
             }
         }
 
-        // 打开登录弹窗
-        function openLoginModal() {
-            const modal = document.getElementById('loginModal');
+        // 打开管理员弹窗
+        function openAdminModal() {
+            const modal = document.getElementById('adminModal');
             modal.classList.remove('hidden', 'active');
-            void modal.offsetWidth;
+            void modal.offsetWidth; // 触发重绘以启用过渡动画
             modal.classList.add('active');
             
-            document.getElementById('username').value = '';
-            document.getElementById('password').value = '';
-            document.getElementById('loginError').classList.add('hidden');
-            document.getElementById('username').focus();
+            // 重置表单
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('adminContent').classList.add('hidden');
+            document.getElementById('adminAuthError').classList.add('hidden');
+            document.getElementById('adminPassword').focus();
         }
 
-        // 关闭登录弹窗
-        function closeLoginModal() {
-            const modal = document.getElementById('loginModal');
+        // 关闭管理员弹窗
+        function closeAdminModal() {
+            const modal = document.getElementById('adminModal');
             modal.classList.remove('active');
             
             setTimeout(() => {
@@ -1459,51 +2017,339 @@
             }, 300);
         }
 
-        // 登录功能
-        function login() {
-            const username = document.getElementById('username').value.trim();
-            const password = document.getElementById('password').value.trim();
-            const errorElement = document.getElementById('loginError');
-
-            if (systemUsers[username] && systemUsers[username].password === password) {
-                currentUser = {
-                    name: username,
-                    role: systemUsers[username].role
-                };
-                
-                // 显示当前用户信息
-                document.getElementById('currentUser').textContent = 
-                    `(当前用户: ${currentUser.name} - ${currentUser.role})`;
-                
-                // 更新按钮状态
-                updateButtonStates();
-                
-                closeLoginModal();
-                alert(`登录成功！欢迎您，${currentUser.role} ${currentUser.name}！`);
+        // 验证管理员密码
+        function verifyAdminPassword() {
+            const password = document.getElementById('adminPassword').value.trim();
+            
+            if (password === ADMIN_PASSWORD) {
+                document.getElementById('adminAuthError').classList.add('hidden');
+                document.getElementById('adminContent').classList.remove('hidden');
+                // 默认显示注册申请管理标签
+                switchAdminTab('application');
             } else {
-                errorElement.classList.remove('hidden');
-                const inputs = [document.getElementById('username'), document.getElementById('password')];
-                inputs.forEach(input => {
-                    input.classList.add('border-red-500');
-                    setTimeout(() => input.classList.remove('border-red-500'), 2000);
-                });
+                document.getElementById('adminAuthError').classList.remove('hidden');
+                document.getElementById('adminPassword').classList.add('border-red-500');
+                setTimeout(() => {
+                    document.getElementById('adminPassword').classList.remove('border-red-500');
+                }, 2000);
             }
         }
 
-        // 退出登录功能
-        function logout() {
-            // 清除用户状态
-            currentUser = null;
+        // 刷新管理员数据（完全重新加载数据）
+        function refreshAdminData() {
+            // 从本地存储强制重新加载所有数据
+            systemUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_USERS)) || {};
+            pendingApplications = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_APPLICATIONS)) || [];
+            gameData = JSON.parse(localStorage.getItem(STORAGE_KEYS.GAME_DATA)) || [];
             
-            // 更新UI显示
-            document.getElementById('currentUser').textContent = '';
-            clearSearch();
+            // 获取当前活动标签
+            let activeTab = 'application';
+            if (document.getElementById('userManagementTab').classList.contains('active')) {
+                activeTab = 'user';
+            } else if (document.getElementById('dataManagementTab').classList.contains('active')) {
+                activeTab = 'data';
+            }
             
-            // 更新按钮状态
-            updateButtonStates();
+            // 重新加载当前标签内容
+            switchAdminTab(activeTab);
             
-            // 显示退出成功信息
-            alert("已成功退出登录");
+            alert("数据已刷新");
+        }
+
+        // 加载待审核申请
+        function loadPendingApplications() {
+            const container = document.getElementById('pendingApplications');
+            const countElement = document.getElementById('pendingCount');
+            
+            // 清空容器
+            container.innerHTML = '';
+            
+            // 从本地存储刷新数据
+            pendingApplications = JSON.parse(localStorage.getItem(STORAGE_KEYS.PENDING_APPLICATIONS)) || [];
+            countElement.textContent = pendingApplications.length;
+            
+            if (pendingApplications.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4" id="noPending">暂无待审核申请</p>';
+                return;
+            }
+            
+            // 添加待审核申请
+            pendingApplications.forEach((app, index) => {
+                const date = new Date(app.timestamp);
+                const formattedDate = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+                
+                const appElement = document.createElement('div');
+                appElement.className = 'pending-item';
+                appElement.innerHTML = `
+                    <div>
+                        <p><strong>用户名:</strong> ${app.username}</p>
+                        <p class="text-sm text-gray-500">申请时间: ${formattedDate}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button class="approve-btn bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-sm" data-index="${index}">
+                            通过
+                        </button>
+                        <button class="reject-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm" data-index="${index}">
+                            拒绝
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(appElement);
+            });
+            
+            // 绑定审核按钮事件（使用事件委托避免重复绑定）
+            container.addEventListener('click', function(e) {
+                if (e.target.classList.contains('approve-btn')) {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    approveApplication(index);
+                } else if (e.target.classList.contains('reject-btn')) {
+                    const index = parseInt(e.target.getAttribute('data-index'));
+                    rejectApplication(index);
+                }
+            });
+        }
+
+        // 加载已注册用户（使用输入框直接设置次数）
+        function loadRegisteredUsers() {
+            const container = document.getElementById('registeredUsers');
+            const countElement = document.getElementById('userCount');
+            
+            // 清空容器
+            container.innerHTML = '';
+            
+            // 从本地存储刷新数据
+            systemUsers = JSON.parse(localStorage.getItem(STORAGE_KEYS.SYSTEM_USERS)) || {};
+            
+            // 获取所有用户（包括管理员，但管理员会有特殊标记和保护）
+            const users = Object.entries(systemUsers)
+                .map(([username, user]) => ({
+                    username,
+                    ...user
+                }));
+            
+            countElement.textContent = users.length;
+            
+            if (users.length === 0) {
+                container.innerHTML = '<p class="text-gray-500 text-center py-4" id="noUsers">暂无注册用户</p>';
+                return;
+            }
+            
+            // 添加用户
+            users.forEach(user => {
+                // 判断是否为管理员账号（受保护，无法删除）
+                const isAdmin = user.role === "管理员";
+                
+                const userElement = document.createElement('div');
+                userElement.className = 'user-item';
+                userElement.setAttribute('data-username', user.username);
+                
+                // 管理员账号显示特殊标记
+                const adminBadge = isAdmin ? '<span class="ml-2 bg-red-100 text-red-800 text-xs px-2 py-0.5 rounded">管理员</span>' : '';
+                
+                // 管理员账号不显示删除按钮
+                const deleteButton = isAdmin ? '' : `
+                    <button class="delete-user-btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-sm">
+                        删除用户
+                    </button>
+                `;
+                
+                userElement.innerHTML = `
+                    <div>
+                        <p><strong>用户名:</strong> ${user.username}${adminBadge}</p>
+                        <p class="text-sm text-gray-500">当前查询次数: ${user.searchCount}</p>
+                    </div>
+                    <div class="flex gap-2 items-center">
+                        <div class="w-24">
+                            <input type="number" min="0" value="${user.searchCount}" class="count-input w-full px-2 py-1 border border-gray-300 rounded text-sm">
+                        </div>
+                        <button class="set-count-btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm">
+                            设置次数
+                        </button>
+                        ${deleteButton}
+                    </div>
+                `;
+                
+                container.appendChild(userElement);
+            });
+            
+            // 绑定用户管理按钮事件（使用事件委托避免重复绑定）
+            container.addEventListener('click', function(e) {
+                const userItem = e.target.closest('.user-item');
+                if (!userItem) return;
+                
+                const username = userItem.getAttribute('data-username');
+                const countInput = userItem.querySelector('.count-input');
+                const count = parseInt(countInput.value) || 0;
+                
+                if (e.target.classList.contains('set-count-btn')) {
+                    setSearchCount(username, count);
+                } else if (e.target.classList.contains('delete-user-btn')) {
+                    deleteUser(username, userItem);
+                }
+            });
+            
+            // 输入框回车键也可以设置次数
+            container.addEventListener('keyup', function(e) {
+                if (e.key === 'Enter' && e.target.classList.contains('count-input')) {
+                    const userItem = e.target.closest('.user-item');
+                    if (userItem) {
+                        const username = userItem.getAttribute('data-username');
+                        const count = parseInt(e.target.value) || 0;
+                        setSearchCount(username, count);
+                    }
+                }
+            });
+        }
+
+        // 直接设置用户查询次数
+        function setSearchCount(username, count) {
+            if (systemUsers[username]) {
+                // 确保次数不小于0
+                const newCount = Math.max(0, count);
+                systemUsers[username].searchCount = newCount;
+                
+                // 立即保存到本地存储
+                localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+                
+                // 更新当前用户的显示
+                const userItems = document.querySelectorAll('.user-item');
+                userItems.forEach(item => {
+                    if (item.getAttribute('data-username') === username) {
+                        item.querySelector('.count-input').value = newCount;
+                        item.querySelector('.text-sm.text-gray-500').textContent = `当前查询次数: ${newCount}`;
+                    }
+                });
+                
+                // 如果是当前登录用户，同步更新其查询次数
+                if (currentUser && currentUser.name === username) {
+                    currentUser.searchCount = newCount;
+                    localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+                    updateUserInfoDisplay();
+                }
+                
+                alert(`已将用户 "${username}" 的查询次数设置为: ${newCount}`);
+            }
+        }
+
+        // 删除用户（立即从界面移除并永久删除）
+        function deleteUser(username, userElement) {
+            // 再次检查是否为管理员（防止意外删除）
+            if (systemUsers[username] && systemUsers[username].role === "管理员") {
+                alert("管理员账号受保护，无法删除！");
+                return;
+            }
+            
+            if (confirm(`确定要永久删除用户 "${username}" 吗？此操作不可恢复！\n删除后该用户将无法登录，所有数据将被清除。`)) {
+                if (systemUsers[username]) {
+                    // 1. 添加淡出动画类
+                    userElement.classList.add('fade-out');
+                    
+                    // 2. 动画完成后从DOM中移除
+                    setTimeout(() => {
+                        userElement.remove();
+                        
+                        // 3. 更新用户计数
+                        const userCount = parseInt(document.getElementById('userCount').textContent) - 1;
+                        document.getElementById('userCount').textContent = userCount;
+                        
+                        // 4. 如果没有用户了，显示提示信息
+                        if (userCount === 0) {
+                            document.getElementById('registeredUsers').innerHTML = 
+                                '<p class="text-gray-500 text-center py-4" id="noUsers">暂无注册用户</p>';
+                        }
+                    }, 300); // 与动画时长匹配
+                    
+                    // 5. 永久删除用户数据
+                    delete systemUsers[username];
+                    
+                    // 6. 立即保存到本地存储
+                    localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+                    
+                    // 7. 如果删除的是当前登录用户，自动退出登录
+                    if (currentUser && currentUser.name === username) {
+                        setTimeout(() => {
+                            logout();
+                        }, 300);
+                    }
+                    
+                    alert(`用户 "${username}" 已被永久删除`);
+                }
+            }
+        }
+
+        // 添加游戏数据
+        function addGameData() {
+            const gameId = document.getElementById('gameId').value.trim();
+            const gameName = document.getElementById('gameName').value.trim();
+            const gamePower = parseInt(document.getElementById('gamePower').value.trim());
+            const gameState = document.getElementById('gameState').value.trim();
+            
+            // 验证数据
+            if (!gameId || !gameName || isNaN(gamePower) || !gameState) {
+                document.getElementById('dataAddError').classList.remove('hidden');
+                document.getElementById('dataAddSuccess').classList.add('hidden');
+                return;
+            }
+            
+            // 添加新数据
+            gameData.push([gameId, gameName, gamePower, gameState]);
+            
+            // 保存到本地存储
+            localStorage.setItem(STORAGE_KEYS.GAME_DATA, JSON.stringify(gameData));
+            
+            // 显示成功信息
+            document.getElementById('dataAddSuccess').classList.remove('hidden');
+            document.getElementById('dataAddError').classList.add('hidden');
+            
+            // 清空输入框
+            document.getElementById('gameId').value = '';
+            document.getElementById('gameName').value = '';
+            document.getElementById('gamePower').value = '';
+            document.getElementById('gameState').value = '';
+            
+            // 聚焦到第一个输入框
+            document.getElementById('gameId').focus();
+        }
+
+        // 批准注册申请
+        function approveApplication(index) {
+            const app = pendingApplications[index];
+            
+            // 添加到系统用户
+            systemUsers[app.username] = {
+                password: app.password,
+                role: "用户",
+                searchCount: MAX_SEARCH_COUNT
+            };
+            
+            // 从待审核列表移除
+            pendingApplications.splice(index, 1);
+            
+            // 保存更改
+            localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+            localStorage.setItem(STORAGE_KEYS.PENDING_APPLICATIONS, JSON.stringify(pendingApplications));
+            
+            // 刷新列表
+            loadPendingApplications();
+            
+            alert(`已批准用户 "${app.username}" 的注册申请`);
+        }
+
+        // 拒绝注册申请
+        function rejectApplication(index) {
+            const app = pendingApplications[index];
+            
+            // 从待审核列表移除
+            pendingApplications.splice(index, 1);
+            
+            // 保存更改
+            localStorage.setItem(STORAGE_KEYS.PENDING_APPLICATIONS, JSON.stringify(pendingApplications));
+            
+            // 刷新列表
+            loadPendingApplications();
+            
+            alert(`已拒绝用户 "${app.username}" 的注册申请`);
         }
 
         // 搜索功能
@@ -1511,8 +2357,33 @@
             // 未登录状态，不允许查询
             if (!currentUser) {
                 alert("请先登录后再进行查询！");
-                openLoginModal();
+                openAuthModal();
                 return;
+            }
+            
+            // 检查查询次数是否用完（管理员不受限制）
+            if (currentUser.role !== "管理员" && currentUser.searchCount <= 0) {
+                alert("您的查询次数已用完，账号将被自动注销！");
+                
+                // 注销账号
+                delete systemUsers[currentUser.name];
+                localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+                
+                // 退出登录
+                logout();
+                return;
+            }
+            
+            // 减少查询次数（管理员不受限制）
+            if (currentUser.role !== "管理员") {
+                currentUser.searchCount--;
+                systemUsers[currentUser.name].searchCount = currentUser.searchCount;
+                localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+                // 更新本地存储中的当前用户状态
+                localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(currentUser));
+                
+                // 更新用户信息显示
+                updateUserInfoDisplay();
             }
             
             const searchTerm = document.getElementById('searchTerm').value.trim();
@@ -1522,10 +2393,16 @@
             resultDiv.innerHTML = '';
             
             if (!searchTerm) {
+                let remainingHtml = '';
+                if (currentUser.role !== "管理员") {
+                    remainingHtml = `<p class="text-orange-500 mt-2">剩余查询次数: ${currentUser.searchCount}</p>`;
+                }
+                
                 resultDiv.innerHTML = `
                     <div class="text-center text-gray-500 py-10">
                         <i class="fa fa-exclamation-circle text-4xl mb-3 text-yellow-500"></i>
                         <p>请输入查询关键词</p>
+                        ${remainingHtml}
                     </div>
                 `;
                 return;
@@ -1568,13 +2445,30 @@
             
             // 显示查询结果
             if (results.length === 0) {
+                let remainingHtml = '';
+                if (currentUser.role !== "管理员") {
+                    remainingHtml = `<p class="text-orange-500 mt-2">剩余查询次数: ${currentUser.searchCount}</p>`;
+                }
+                
                 resultDiv.innerHTML = `
                     <div class="text-center text-gray-500 py-10">
                         <i class="fa fa-search text-4xl mb-3 opacity-30"></i>
                         <p>未找到匹配的记录</p>
+                        ${remainingHtml}
                     </div>
                 `;
             } else {
+                // 检查是否是最后一次查询（管理员不受限制）
+                let lastSearchWarning = '';
+                if (currentUser.role !== "管理员" && currentUser.searchCount === 0) {
+                    lastSearchWarning = '<p class="text-red-500 mt-2">这是您的最后一次查询，账号即将被注销</p>';
+                }
+                
+                let remainingHtml = '';
+                if (currentUser.role !== "管理员") {
+                    remainingHtml = `<span class="text-orange-500 ml-2">剩余查询次数: ${currentUser.searchCount}</span>`;
+                }
+                
                 const resultHTML = results.map(item => `
                     <div class="result-item">
                         <p><strong>游戏编号:</strong> ${highlightMatch(item.gameId, item.searchTerm, item.idMatch)}</p>
@@ -1587,9 +2481,28 @@
                 resultDiv.innerHTML = `
                     <div class="mb-4 text-gray-600">
                         <i class="fa fa-check-circle text-green-500"></i> 找到 ${results.length} 条匹配记录
+                        ${remainingHtml}
                     </div>
                     ${resultHTML}
+                    ${lastSearchWarning}
                 `;
+            }
+            
+            // 更新按钮状态
+            updateButtonStates();
+            
+            // 如果查询次数用完，提示并注销账号（管理员不受限制）
+            if (currentUser.role !== "管理员" && currentUser.searchCount === 0) {
+                setTimeout(() => {
+                    alert("您的查询次数已用完，账号将被自动注销！");
+                    
+                    // 注销账号
+                    delete systemUsers[currentUser.name];
+                    localStorage.setItem(STORAGE_KEYS.SYSTEM_USERS, JSON.stringify(systemUsers));
+                    
+                    // 退出登录
+                    logout();
+                }, 2000);
             }
         }
         
@@ -1599,7 +2512,13 @@
             let message = "请先登录后再进行查询";
             
             if (currentUser) {
-                message = "请输入查询关键词开始搜索";
+                if (currentUser.role === "管理员") {
+                    message = "请输入查询关键词开始搜索（管理员无查询次数限制）";
+                } else if (currentUser.searchCount <= 0) {
+                    message = "您的查询次数已用完，账号将被自动注销";
+                } else {
+                    message = `请输入查询关键词开始搜索（剩余 ${currentUser.searchCount} 次）`;
+                }
             }
             
             document.getElementById('result').innerHTML = `
@@ -1632,23 +2551,41 @@
             }
         });
 
-        document.getElementById('password').addEventListener('keyup', function(event) {
+        // 登录和注册表单的回车键处理
+        document.getElementById('loginPassword').addEventListener('keyup', function(event) {
             if (event.key === 'Enter') {
                 login();
             }
         });
 
+        document.getElementById('regConfirmPassword').addEventListener('keyup', function(event) {
+            if (event.key === 'Enter') {
+                submitRegistration();
+            }
+        });
+
         // 点击弹窗外部关闭弹窗
-        document.getElementById('loginModal').addEventListener('click', function(e) {
+        document.getElementById('authModal').addEventListener('click', function(e) {
             if (e.target === this) {
-                closeLoginModal();
+                closeAuthModal();
+            }
+        });
+
+        document.getElementById('adminModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeAdminModal();
             }
         });
 
         // ESC键关闭弹窗
         document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && !document.getElementById('loginModal').classList.contains('hidden')) {
-                closeLoginModal();
+            if (e.key === 'Escape') {
+                if (!document.getElementById('authModal').classList.contains('hidden')) {
+                    closeAuthModal();
+                }
+                if (!document.getElementById('adminModal').classList.contains('hidden')) {
+                    closeAdminModal();
+                }
             }
         });
     </script>
